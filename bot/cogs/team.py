@@ -65,6 +65,7 @@ class TeamCog(commands.Cog):
     @app_commands.describe(code="Team invitation code")
     async def join_team(self, interaction: discord.Interaction, code: str):
         try:
+            await interaction.response.defer(ephemeral=True)
             profile = db.get_profile(str(interaction.user.id))
             if not profile:
                 await interaction.followup.send(
