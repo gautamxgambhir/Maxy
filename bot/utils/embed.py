@@ -1,7 +1,7 @@
 import discord
 from config import Config
 
-def create_embed(title, description, color=discord.Color.blue()):
+def create_embed(title, description, color=discord.Color.red()):
     embed = discord.Embed(
         title=title,
         description=description,
@@ -16,7 +16,7 @@ def profile_embed(profile):
     embed = create_embed(
         f"Profile: {profile['name']}",
         f"Discord: {profile['discord_username']}",
-        discord.Color.green()
+        discord.Color.red()
     )
     if profile['skills']:
         embed.add_field(name="Skills", value=profile['skills'], inline=False)
@@ -28,7 +28,7 @@ def search_results_embed(results):
     embed = create_embed(
         "🔍 Hackers Search Results",
         f"Found {len(results)} matching profiles:",
-        discord.Color.blue()
+        discord.Color.red()
     )
     
     for profile in results:
@@ -42,3 +42,28 @@ def search_results_embed(results):
         )
     
     return embed
+
+def team_info_embed(team_info):
+    owner_name = team_info.get('owner_name', team_info['owner'])
+    
+    embed = create_embed(
+        f"Team: {team_info['name']}",
+        f"Invite Code: `{team_info['code']}`\nOwner: {owner_name}",
+        discord.Color.blue()
+    )
+    
+    if team_info['members']:
+        members_list = "\n".join([f"• {member}" for member in team_info['members']])
+        embed.add_field(
+            name=f"Members ({len(team_info['members'])})",
+            value=members_list,
+            inline=False
+        )
+    else:
+        embed.add_field(
+            name="Members",
+            value="No members yet",
+            inline=False
+        )
+    
+    return embed    

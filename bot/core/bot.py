@@ -4,6 +4,8 @@ from config import Config
 from .database import db
 from bot.cogs.find import FindCog
 from bot.cogs.profile import ProfileCog
+from bot.cogs.feedback import FeedbackCog
+from bot.cogs.team import TeamCog
 import logging
 
 class MaximallyBot(commands.Bot):
@@ -14,18 +16,18 @@ class MaximallyBot(commands.Bot):
             intents=intents,
             activity=discord.Activity(
                 type=discord.ActivityType.watching,
-                name="hackers build the future"
+                name="you all...!"
             )
         )
         self.logger = logging.getLogger(__name__)
         self.config = Config
 
     async def setup_hook(self):
-        # Add cogs
         await self.add_cog(ProfileCog(self))
         await self.add_cog(FindCog(self))
-        
-        # Sync commands
+        await self.add_cog(FeedbackCog(self))
+        await self.add_cog(TeamCog(self))
+
         if self.config.GUILD_ID:
             guild = discord.Object(id=self.config.GUILD_ID)
             self.tree.copy_global_to(guild=guild)
@@ -37,4 +39,3 @@ class MaximallyBot(commands.Bot):
 
     async def on_ready(self):
         self.logger.info(f"Logged in as {self.user} (ID: {self.user.id})")
-        self.logger.info("------")

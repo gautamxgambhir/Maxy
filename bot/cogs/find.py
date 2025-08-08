@@ -33,7 +33,6 @@ class FindCog(commands.Cog):
                 )
                 return
             
-            # Search database
             results = db.search_profiles(
                 skills=skills,
                 interests=interests,
@@ -47,7 +46,6 @@ class FindCog(commands.Cog):
                 )
                 return
             
-            # Format results
             embed = search_results_embed(results)
             await interaction.response.send_message(embed=embed)
             self.logger.info(f"Search completed for {interaction.user}")
