@@ -12,7 +12,7 @@ class ProfileCog(commands.Cog):
 
     @app_commands.command(
         name="register-profile",
-        description="Create your hacker profile"
+        description="Create your profile"
     )
     @app_commands.describe(
         name="Your full name",
@@ -71,7 +71,7 @@ class ProfileCog(commands.Cog):
 
     @app_commands.command(
         name="edit-profile",
-        description="Update your hacker profile"
+        description="Update your profile"
     )
     @app_commands.describe(
         name="Your full name (leave blank to keep current)",
@@ -143,7 +143,7 @@ class ProfileCog(commands.Cog):
 
     @app_commands.command(
         name="view-profile",
-        description="View your hacker profile"
+        description="View your profile"
     )
     async def view_profile(
         self,

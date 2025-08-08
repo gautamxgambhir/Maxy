@@ -18,7 +18,7 @@ class FeedbackCog(commands.Cog):
 
     @app_commands.command(
         name="feedback",
-        description="Send feedback to the bot developers"
+        description="Send feedback to the bot developer"
     )
     @app_commands.describe(
         message="Your feedback or suggestions"

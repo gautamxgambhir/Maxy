@@ -9,7 +9,7 @@ def create_embed(title, description, color=discord.Color.red()):
     )
     if Config.MAXIMALLY_LOGO_URL:
         embed.set_thumbnail(url=Config.MAXIMALLY_LOGO_URL)
-    embed.set_footer(text="Maximally Hackers Network")
+    embed.set_footer(text="Maximally : The global hackathon league")
     return embed
 
 def profile_embed(profile):
@@ -26,7 +26,7 @@ def profile_embed(profile):
 
 def search_results_embed(results):
     embed = create_embed(
-        "🔍 Hackers Search Results",
+        "🔍 Users Search Results",
         f"Found {len(results)} matching profiles:",
         discord.Color.red()
     )

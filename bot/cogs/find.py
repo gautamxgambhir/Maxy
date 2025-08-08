@@ -11,7 +11,7 @@ class FindCog(commands.Cog):
 
     @app_commands.command(
         name="find",
-        description="Find hackers by skills or interests"
+        description="Find Users by skills or interests"
     )
     @app_commands.describe(
         skills="Skills to search (comma separated)",
