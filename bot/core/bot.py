@@ -6,6 +6,7 @@ from bot.cogs.find import FindCog
 from bot.cogs.profile import ProfileCog
 from bot.cogs.feedback import FeedbackCog
 from bot.cogs.team import TeamCog
+from bot.cogs.volunteer import VolunteerCog
 from bot.cogs.email_assistant import EmailAssistantCog
 import logging
 
@@ -28,6 +29,7 @@ class MaximallyBot(commands.Bot):
         await self.add_cog(FindCog(self))
         await self.add_cog(FeedbackCog(self))
         await self.add_cog(TeamCog(self))
+        await self.add_cog(VolunteerCog(self))
         await self.add_cog(EmailAssistantCog(self))
 
         if self.config.GUILD_ID:

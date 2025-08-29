@@ -29,26 +29,32 @@ class FeedbackCog(commands.Cog):
         message: str
     ):
         try:
+            # Defer the response since we do file I/O operations
+            await interaction.response.defer(ephemeral=True)
+
             timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             user_id = interaction.user.id
             username = f"{interaction.user.name}"
-            
+
             with open(self.feedback_file, 'a', newline='') as f:
                 writer = csv.writer(f)
                 writer.writerow([timestamp, user_id, username, message])
-            
-            await interaction.response.send_message(
+
+            await interaction.followup.send(
                 "✅ Thank you for your feedback! We appreciate your input.",
                 ephemeral=True
             )
             self.logger.info(f"Feedback received from {username}")
-            
+
         except Exception as e:
             self.logger.error(f"Feedback command error: {str(e)}")
-            await interaction.response.send_message(
-                "❌ Failed to save feedback. Please try again later.", 
-                ephemeral=True
-            )
+            try:
+                await interaction.followup.send(
+                    "❌ Failed to save feedback. Please try again later.",
+                    ephemeral=True
+                )
+            except Exception as followup_error:
+                self.logger.error(f"Failed to send followup: {followup_error}")
 
 async def setup(bot):
     await bot.add_cog(FeedbackCog(bot))

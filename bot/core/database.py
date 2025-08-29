@@ -19,7 +19,20 @@ class Database:
         else:
             self.mode = "sqlite"
             self.db_path = Config.DATABASE_PATH
-        self.setup_database()
+
+        # Try to setup database, with fallback to SQLite if PostgreSQL fails
+        try:
+            self.setup_database()
+        except Exception as e:
+            if self.mode == "postgres":
+                logger.warning(f"Initial PostgreSQL setup failed: {str(e)}")
+                logger.info("Attempting fallback to SQLite...")
+                self.mode = "sqlite"
+                self.db_path = Config.DATABASE_PATH
+                self.setup_database()
+                logger.info("Successfully fell back to SQLite database")
+            else:
+                raise
 
     @contextmanager
     def get_connection(self):
@@ -28,8 +41,19 @@ class Database:
         conn = None
         try:
             if self.mode == "postgres":
-                conn = psycopg2.connect(self.database_url, sslmode="require")
-                conn.autocommit = True
+                try:
+                    conn = psycopg2.connect(self.database_url, sslmode="require")
+                    conn.autocommit = True
+                except Exception as e:
+                    logger.warning(f"PostgreSQL connection failed: {str(e)}")
+                    logger.info("Falling back to SQLite...")
+                    self.mode = "sqlite"
+                    self.db_path = Config.DATABASE_PATH
+                    # ensure data/ folder exists for SQLite
+                    os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
+                    conn = sqlite3.connect(self.db_path)
+                    conn.row_factory = sqlite3.Row
+                    conn.execute("PRAGMA foreign_keys = ON")
             else:
                 # ensure data/ folder exists for SQLite
                 os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
@@ -87,13 +111,50 @@ class Database:
                     )
                 ''')
 
+                # Volunteer tasks table
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS volunteer_tasks (
+                        id SERIAL PRIMARY KEY,
+                        title TEXT NOT NULL,
+                        creator_id TEXT NOT NULL,
+                        creator_username TEXT NOT NULL,
+                        status TEXT DEFAULT 'open',
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                ''')
+
+                # Volunteer task participants table
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS volunteer_participants (
+                        task_id INTEGER NOT NULL,
+                        discord_id TEXT NOT NULL,
+                        discord_username TEXT NOT NULL,
+                        joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        PRIMARY KEY (task_id, discord_id)
+                    )
+                ''')
+
                 if self.mode == "sqlite":
                     conn.commit()
 
             logger.info("Database setup complete")
         except Exception as e:
             logger.error(f"Database setup failed: {str(e)}")
-            raise
+
+            # If PostgreSQL fails, try to fall back to SQLite
+            if self.mode == "postgres":
+                logger.warning("PostgreSQL connection failed, falling back to SQLite...")
+                self.mode = "sqlite"
+                self.db_path = Config.DATABASE_PATH
+                try:
+                    self.setup_database()  # Retry with SQLite
+                    logger.info("Successfully fell back to SQLite database")
+                except Exception as fallback_e:
+                    logger.error(f"SQLite fallback also failed: {str(fallback_e)}")
+                    raise fallback_e
+            else:
+                raise
 
     # ---------------- PROFILE METHODS ---------------- #
 
@@ -268,6 +329,105 @@ class Database:
             cursor.execute(query, (new_owner_id, team_id))
             if self.mode == "sqlite":
                 conn.commit()
+
+    # ---------------- VOLUNTEER METHODS ---------------- #
+
+    def create_volunteer_task(self, title, creator_id, creator_username):
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            if self.mode == "postgres":
+                cursor.execute(
+                    "INSERT INTO volunteer_tasks (title, creator_id, creator_username) VALUES (%s, %s, %s) RETURNING id",
+                    (title, creator_id, creator_username)
+                )
+                task_id = cursor.fetchone()["id"]
+            else:
+                cursor.execute(
+                    "INSERT INTO volunteer_tasks (title, creator_id, creator_username) VALUES (?, ?, ?)",
+                    (title, creator_id, creator_username)
+                )
+                task_id = cursor.lastrowid
+                conn.commit()
+            return task_id
+
+    def get_volunteer_task_by_id(self, task_id):
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            query = "SELECT * FROM volunteer_tasks WHERE id = %s" if self.mode == "postgres" else "SELECT * FROM volunteer_tasks WHERE id = ?"
+            cursor.execute(query, (task_id,))
+            return cursor.fetchone()
+
+    def get_all_volunteer_tasks(self):
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM volunteer_tasks ORDER BY created_at DESC")
+            return cursor.fetchall()
+
+    def join_volunteer_task(self, task_id, discord_id, discord_username):
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            try:
+                # Check if task exists and is open
+                task = self.get_volunteer_task_by_id(task_id)
+                if not task or task["status"] != "open":
+                    return False
+
+                query = "INSERT INTO volunteer_participants (task_id, discord_id, discord_username) VALUES (%s, %s, %s)" if self.mode == "postgres" else "INSERT INTO volunteer_participants (task_id, discord_id, discord_username) VALUES (?, ?, ?)"
+                cursor.execute(query, (task_id, discord_id, discord_username))
+                if self.mode == "sqlite":
+                    conn.commit()
+                return True
+            except Exception:
+                return False
+
+    def leave_volunteer_task(self, task_id, discord_id):
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            query = "DELETE FROM volunteer_participants WHERE task_id = %s AND discord_id = %s" if self.mode == "postgres" else "DELETE FROM volunteer_participants WHERE task_id = ? AND discord_id = ?"
+            cursor.execute(query, (task_id, discord_id))
+            if self.mode == "sqlite":
+                conn.commit()
+            return cursor.rowcount > 0
+
+    def get_user_volunteer_status(self, discord_id):
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+
+            # Get tasks created by user
+            created_query = "SELECT * FROM volunteer_tasks WHERE creator_id = %s ORDER BY created_at DESC" if self.mode == "postgres" else "SELECT * FROM volunteer_tasks WHERE creator_id = ? ORDER BY created_at DESC"
+            cursor.execute(created_query, (discord_id,))
+            created = cursor.fetchall()
+
+            # Get tasks joined by user
+            joined_query = '''
+                SELECT vt.* FROM volunteer_tasks vt
+                JOIN volunteer_participants vp ON vt.id = vp.task_id
+                WHERE vp.discord_id = %s ORDER BY vp.joined_at DESC
+            ''' if self.mode == "postgres" else '''
+                SELECT vt.* FROM volunteer_tasks vt
+                JOIN volunteer_participants vp ON vt.id = vp.task_id
+                WHERE vp.discord_id = ? ORDER BY vp.joined_at DESC
+            '''
+            cursor.execute(joined_query, (discord_id,))
+            joined = cursor.fetchall()
+
+            return {"created": created, "joined": joined}
+
+    def remove_volunteer_task(self, task_id):
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            # Remove participants first
+            q1 = "DELETE FROM volunteer_participants WHERE task_id = %s" if self.mode == "postgres" else "DELETE FROM volunteer_participants WHERE task_id = ?"
+            cursor.execute(q1, (task_id,))
+
+            # Remove task
+            q2 = "DELETE FROM volunteer_tasks WHERE id = %s" if self.mode == "postgres" else "DELETE FROM volunteer_tasks WHERE id = ?"
+            cursor.execute(q2, (task_id,))
+
+            if self.mode == "sqlite":
+                conn.commit()
+
+            return cursor.rowcount > 0
 
 
 db = Database()

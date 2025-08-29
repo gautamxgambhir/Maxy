@@ -1,6 +1,6 @@
 # 🤖 Maxy - Comprehensive Discord Bot
 
-Maxy is a comprehensive Discord bot designed for hackathon operations and community management. Featuring advanced email automation, user profiling, team formation, user discovery, and feedback collection capabilities. Built with professional email template management, dynamic placeholder processing, and seamless integration with the Resend API.
+Maxy is a comprehensive Discord bot designed for hackathon operations and community management. Featuring advanced email automation, user profiling, team formation, user discovery, volunteer coordination, and feedback collection capabilities. Built with professional email template management, dynamic placeholder processing, and seamless integration with the Resend API.
 
 ## 🎯 Features
 
@@ -36,6 +36,13 @@ Maxy is a comprehensive Discord bot designed for hackathon operations and commun
 - **CSV Logging** - Store feedback for analysis
 - **Timestamp Tracking** - Record submission times
 
+### 🤝 Volunteer Management
+- **Task Creation** - Create volunteer opportunities for hackathons
+- **Task Participation** - Join and leave volunteer tasks
+- **Task Tracking** - Monitor volunteer status and participation
+- **Task Management** - Administrative controls for task management
+- **Participant Management** - Track volunteer participants and their commitments
+
 ## 📋 Table of Contents
 
 - [Quick Start](#-quick-start)
@@ -47,6 +54,7 @@ Maxy is a comprehensive Discord bot designed for hackathon operations and commun
   - [Profile Commands](#profile-commands)
   - [User Discovery Commands](#user-discovery-commands)
   - [Team Commands](#team-commands)
+  - [Volunteer Commands](#volunteer-commands)
   - [Feedback Commands](#feedback-commands)
   - [Email Commands](#email-commands)
 - [Usage Examples](#-usage-examples)
@@ -87,39 +95,44 @@ graph TB
         A[Discord User] --> B[Profile Cog]
         A --> C[Find Cog]
         A --> D[Team Cog]
-        A --> E[Feedback Cog]
-        A --> F[Email Assistant Cog]
+        A --> E[Volunteer Cog]
+        A --> F[Feedback Cog]
+        A --> G[Email Assistant Cog]
 
-        B --> G[Slash Commands]
-        C --> G
-        D --> G
-        E --> G
-        F --> G
-        G --> H[Interactive UI]
+        B --> H[Slash Commands]
+        C --> H
+        D --> H
+        E --> H
+        F --> H
+        G --> H
+        H --> I[Interactive UI]
     end
 
     subgraph "Core Layer"
-        B --> I[Profile Manager]
-        C --> J[Search Engine]
-        D --> K[Team Manager]
-        E --> L[Feedback Logger]
-        F --> M[Template Manager]
-        F --> N[Resend Client]
-        F --> O[Email Logger]
-        F --> P[Placeholder Processor]
+        B --> J[Profile Manager]
+        C --> K[Search Engine]
+        D --> L[Team Manager]
+        E --> M[Volunteer Manager]
+        F --> N[Feedback Logger]
+        G --> O[Template Manager]
+        G --> P[Resend Client]
+        G --> Q[Email Logger]
+        G --> R[Placeholder Processor]
     end
 
     subgraph "Data Layer"
-        I --> Q[SQLite Database]
-        J --> Q
-        K --> Q
-        L --> R[CSV Files]
-        M --> Q
-        O --> Q
-        Q --> S[User Profiles]
-        Q --> T[Teams]
-        Q --> U[Email Templates]
-        Q --> V[Email Logs]
+        J --> S[SQLite Database]
+        K --> S
+        L --> S
+        M --> S
+        N --> T[CSV Files]
+        O --> S
+        Q --> S
+        S --> U[User Profiles]
+        S --> V[Teams]
+        S --> W[Volunteer Tasks]
+        S --> X[Email Templates]
+        S --> Y[Email Logs]
     end
 
     subgraph "External Services"
@@ -132,8 +145,8 @@ graph TB
 Maxy follows a modular architecture with clear separation of concerns across multiple specialized cogs:
 
 1. **Presentation Layer** - Discord slash commands and interactive UI components
-2. **Business Logic Layer** - Profile management, team operations, user discovery, feedback collection, and email processing
-3. **Data Access Layer** - SQLite database operations for profiles, teams, and email data
+2. **Business Logic Layer** - Profile management, team operations, user discovery, volunteer coordination, feedback collection, and email processing
+3. **Data Access Layer** - SQLite database operations for profiles, teams, volunteer tasks, and email data
 4. **External Integration Layer** - Resend API communication for email sending
 5. **Utility Layer** - Shared validation, embedding, and formatting utilities
 
@@ -141,6 +154,7 @@ Maxy follows a modular architecture with clear separation of concerns across mul
 - **ProfileCog** - User profile creation, editing, and viewing
 - **FindCog** - User discovery based on skills and interests
 - **TeamCog** - Team formation, management, and membership operations
+- **VolunteerCog** - Volunteer task creation, management, and participant coordination
 - **FeedbackCog** - Anonymous feedback collection and logging
 - **EmailAssistantCog** - Comprehensive email template management and sending
 
@@ -206,6 +220,12 @@ maximally-bot/
 │   │       ├── Anonymous feedback
 │   │       ├── CSV logging
 │   │       └── Timestamp tracking
+│   │   └── volunteer.py         # VOLUNTEER MANAGEMENT COG
+│   │       ├── VolunteerCog class
+│   │       ├── Task creation/management
+│   │       ├── Participant tracking
+│   │       ├── Status monitoring
+│   │       └── Administrative controls
 │   ├── core/                     # Core bot functionality
 │   │   ├── __init__.py          # Core package init
 │   │   ├── bot.py               # Main bot class
@@ -293,6 +313,7 @@ maximally-bot/
 - **`find.py`**: User discovery system for finding members by skills and interests
 - **`team.py`**: Team formation and management with membership controls
 - **`feedback.py`**: Anonymous feedback collection and logging system
+- **`volunteer.py`**: Volunteer task management and participant coordination
 
 #### **Tests (`tests/`)**
 - **`test_email_workflow.py`**: Comprehensive test suite covering all functionality
@@ -371,7 +392,7 @@ resend==0.7.0                # Email sending API client
 
 The system uses two SQLite databases:
 
-1. **`data/profiles.db`** - User profiles, teams, and team membership data
+1. **`data/profiles.db`** - User profiles, teams, team membership, and volunteer tasks data
 2. **`data/email_assistant.db`** - Email templates and sending logs
 
 Database paths can be customized in `config.py`.
@@ -574,6 +595,111 @@ Maxy provides comprehensive commands across multiple categories for complete hac
 2. Validates new owner is team member
 3. Shows confirmation dialog
 4. Transfers ownership
+
+---
+
+## Volunteer Commands
+
+### `/volunteer add`
+
+**Purpose**: Create a new volunteer task for hackathon events
+
+**Parameters**:
+- `title` (required): Title/description of the volunteer task
+
+**Usage**:
+```bash
+/volunteer add title:"Help with registration desk at TechCrunch Hackathon"
+```
+
+**Process**:
+1. Creates a new volunteer task
+2. Assigns creator as the task owner
+3. Sets status to "open"
+4. Returns task details with ID
+
+### `/volunteer list`
+
+**Purpose**: View all available volunteer tasks
+
+**Parameters**: None
+
+**Usage**:
+```bash
+/volunteer list
+```
+
+**Shows**:
+- All volunteer tasks with their status
+- Task IDs, titles, and creators
+- Creation dates and participant counts
+
+### `/volunteer join`
+
+**Purpose**: Join an existing volunteer task
+
+**Parameters**:
+- `task_id` (required): ID of the task to join
+
+**Usage**:
+```bash
+/volunteer join task_id:5
+```
+
+**Process**:
+1. Validates task exists and is open
+2. Adds user as a participant
+3. Returns updated task information
+
+### `/volunteer leave`
+
+**Purpose**: Leave a volunteer task you've joined
+
+**Parameters**:
+- `task_id` (required): ID of the task to leave
+
+**Usage**:
+```bash
+/volunteer leave task_id:5
+```
+
+**Process**:
+1. Removes user from task participants
+2. Returns updated task information
+
+### `/volunteer status`
+
+**Purpose**: View your volunteer activity and status
+
+**Parameters**: None
+
+**Usage**:
+```bash
+/volunteer status
+```
+
+**Shows**:
+- Tasks you've created
+- Tasks you've joined
+- Status of each task
+- Activity summary
+
+### `/volunteer remove`
+
+**Purpose**: Remove a volunteer task (admin only)
+
+**Parameters**:
+- `task_id` (required): ID of the task to remove
+
+**Usage**:
+```bash
+/volunteer remove task_id:5
+```
+
+**Process**:
+1. Requires administrator permissions
+2. Permanently deletes the task
+3. Removes all participants
 
 ---
 
@@ -883,6 +1009,28 @@ Maxy provides comprehensive commands across multiple categories for complete hac
 /feedback message:"Love the new team features! Could you add a team chat function?"
 ```
 
+### Volunteer Management
+
+```bash
+# Create a volunteer task
+/volunteer add title:"Registration desk helper for AI Hackathon"
+
+# List all volunteer tasks
+/volunteer list
+
+# Join a volunteer task
+/volunteer join task_id:3
+
+# Check your volunteer status
+/volunteer status
+
+# Leave a volunteer task
+/volunteer leave task_id:3
+
+# Remove a task (admin only)
+/volunteer remove task_id:3
+```
+
 ### Email Automation
 
 #### Basic Email Sending
@@ -938,14 +1086,23 @@ Maxy provides comprehensive commands across multiple categories for complete hac
 # 3. Create or join a team
 /create-team name:"DataViz Team"
 
-# 4. Send professional emails
+# 4. Create volunteer opportunities
+/volunteer add title:"Registration desk helper for AI Hackathon"
+
+# 5. Find volunteers for your tasks
+/volunteer list
+
+# 6. Send professional emails
 /email-send category:sponsors template:first-touch recipient_email:sponsor@company.com recipient_name:Ms. Johnson placeholders:organization:TechCorp,event_name:AI Hackathon
 
-# 5. Check email statistics
+# 7. Check email statistics
 /email action:stats
 
-# 6. Provide feedback
-/feedback message:"Great bot! The team features are very useful."
+# 8. View your volunteer status
+/volunteer status
+
+# 9. Provide feedback
+/feedback message:"Great bot! The volunteer system is very helpful for organizing events."
 ```
 
 ---
@@ -1014,6 +1171,30 @@ CREATE TABLE email_logs (
     error_message TEXT,
     sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     sent_by INTEGER -- Discord user ID
+);
+```
+
+#### Volunteer Tasks Table
+```sql
+CREATE TABLE volunteer_tasks (
+    id SERIAL PRIMARY KEY,
+    title TEXT NOT NULL,
+    creator_id TEXT NOT NULL,
+    creator_username TEXT NOT NULL,
+    status TEXT DEFAULT 'open',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+#### Volunteer Participants Table
+```sql
+CREATE TABLE volunteer_participants (
+    task_id INTEGER NOT NULL,
+    discord_id TEXT NOT NULL,
+    discord_username TEXT NOT NULL,
+    joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (task_id, discord_id)
 );
 ```
 
@@ -1212,12 +1393,22 @@ A: Use `/email-list` to see available templates, or check category/name spelling
 **Q: Placeholders not filling**
 A: Use format `key:value,key:value` and ensure all required placeholders are provided
 
+**Q: Volunteer task not showing up**
+A: Check that the task was created successfully and try using `/volunteer list` to see all tasks
+
+**Q: Can't join volunteer task**
+A: Make sure you have a profile created first with `/register-profile`, and that the task is still open
+
+**Q: Team creation failed**
+A: Ensure you have a profile created and are not already in another team
+
 ### Getting Help
 
-1. Check `/email action:help` for command reference
-2. Review this README for detailed usage
-3. Check existing GitHub issues
-4. Create new issue with detailed description
+1. Check `/email action:help` for email command reference
+2. Check `/volunteer status` for volunteer activity overview
+3. Review this README for detailed usage
+4. Check existing GitHub issues
+5. Create new issue with detailed description
 
 ### Feature Requests
 

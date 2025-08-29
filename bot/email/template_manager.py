@@ -4,12 +4,14 @@ import uuid
 from typing import List, Optional, Dict, Any, Tuple
 from .models import Template, TemplateCategory, TemplateTone
 from .database import email_db
+from .all_templates import get_complete_template_collection
 
 class TemplateManager:
     
     def __init__(self):
         self.logger = logging.getLogger(__name__)
         self.db = email_db
+        self._seed_templates()
         
     async def get_template(self, category: str, template_name: str) -> Optional[Template]:
         """Retrieve specific template by category and name."""
@@ -294,5 +296,48 @@ class TemplateManager:
         
         self.logger.info(f"Bulk import completed: {success_count} success, {error_count} errors")
         return success_count, error_count, errors
+
+    def _seed_templates(self):
+        """Seed the database with default templates if not already present."""
+        try:
+            # Check if templates are already seeded by counting existing templates
+            existing_count = len(self.db.get_all_templates())
+
+            if existing_count > 0:
+                self.logger.info(f"Templates already seeded: {existing_count} templates found")
+                return
+
+            # Get all templates from the collection
+            template_data = get_complete_template_collection()
+            self.logger.info(f"Seeding {len(template_data)} templates into database")
+
+            success_count = 0
+            error_count = 0
+
+            for template_dict in template_data:
+                try:
+                    # Create template using the existing add_template method
+                    template = self.add_template(
+                        category=template_dict['category'],
+                        name=template_dict['name'],
+                        subject=template_dict['subject'],
+                        body=template_dict['body'],
+                        tone=template_dict.get('tone', 'formal')
+                    )
+
+                    if template:
+                        success_count += 1
+                    else:
+                        error_count += 1
+                        self.logger.warning(f"Failed to seed template: {template_dict['category']}/{template_dict['name']}")
+
+                except Exception as e:
+                    error_count += 1
+                    self.logger.error(f"Error seeding template {template_dict.get('name', 'unknown')}: {str(e)}")
+
+            self.logger.info(f"Template seeding completed: {success_count} success, {error_count} errors")
+
+        except Exception as e:
+            self.logger.error(f"Template seeding failed: {str(e)}")
 
 template_manager = TemplateManager()

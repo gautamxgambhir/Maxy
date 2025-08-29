@@ -26,33 +26,39 @@ class FindCog(commands.Cog):
         limit: app_commands.Range[int, 1, 20] = 10
     ):
         try:
+            # Defer the response since we do database operations
+            await interaction.response.defer(ephemeral=True)
+
             if not skills and not interests:
-                await interaction.response.send_message(
-                    "⚠️ Please provide at least one search criteria", 
+                await interaction.followup.send(
+                    "⚠️ Please provide at least one search criteria",
                     ephemeral=True
                 )
                 return
-            
+
             results = db.search_profiles(
                 skills=skills,
                 interests=interests,
                 limit=limit
             )
-            
+
             if not results:
-                await interaction.response.send_message(
+                await interaction.followup.send(
                     "🔍 No profiles found matching your criteria",
                     ephemeral=True
                 )
                 return
-            
+
             embed = search_results_embed(results)
-            await interaction.response.send_message(embed=embed)
+            await interaction.followup.send(embed=embed, ephemeral=True)
             self.logger.info(f"Search completed for {interaction.user}")
 
         except Exception as e:
             self.logger.error(f"Find command error: {str(e)}")
-            await interaction.response.send_message(
-                "❌ Error searching profiles. Please try again later.", 
-                ephemeral=True
-            )
+            try:
+                await interaction.followup.send(
+                    "❌ Error searching profiles. Please try again later.",
+                    ephemeral=True
+                )
+            except Exception as followup_error:
+                self.logger.error(f"Failed to send followup: {followup_error}")

@@ -27,21 +27,24 @@ class ProfileCog(commands.Cog):
         interests: str
     ):
         try:
+            # Defer the response since we do database operations
+            await interaction.response.defer(ephemeral=True)
+
             name = validation.validate_name(name)
             skills = validation.validate_skills(skills)
             interests = validation.validate_interests(interests)
-            
+
             discord_id = str(interaction.user.id)
             discord_username = f"{interaction.user.name}"
-            
+
             db.upsert_profile(
-                discord_id, 
-                discord_username, 
-                name, 
-                skills, 
+                discord_id,
+                discord_username,
+                name,
+                skills,
                 interests
             )
-            
+
             profile = {
                 'name': name,
                 'discord_username': discord_username,
@@ -49,25 +52,31 @@ class ProfileCog(commands.Cog):
                 'interests': interests
             }
             embed = profile_embed(profile)
-            
-            await interaction.response.send_message(
-                embed=embed, 
+
+            await interaction.followup.send(
+                embed=embed,
                 ephemeral=True,
                 content="✅ Profile created successfully!"
             )
             self.logger.info(f"Profile registered for {discord_username}")
-            
+
         except ValueError as e:
-            await interaction.response.send_message(
-                f"❌ Validation error: {str(e)}", 
-                ephemeral=True
-            )
+            try:
+                await interaction.followup.send(
+                    f"❌ Validation error: {str(e)}",
+                    ephemeral=True
+                )
+            except Exception as followup_error:
+                self.logger.error(f"Failed to send followup: {followup_error}")
         except Exception as e:
             self.logger.error(f"Profile registration error: {str(e)}")
-            await interaction.response.send_message(
-                "❌ Failed to create profile. Please try again later.", 
-                ephemeral=True
-            )
+            try:
+                await interaction.followup.send(
+                    "❌ Failed to create profile. Please try again later.",
+                    ephemeral=True
+                )
+            except Exception as followup_error:
+                self.logger.error(f"Failed to send followup: {followup_error}")
 
     @app_commands.command(
         name="edit-profile",
@@ -86,11 +95,14 @@ class ProfileCog(commands.Cog):
         interests: str = None
     ):
         try:
+            # Defer the response since we do database operations
+            await interaction.response.defer(ephemeral=True)
+
             discord_id = str(interaction.user.id)
             current_profile = db.get_profile(discord_id)
-            
+
             if not current_profile:
-                await interaction.response.send_message(
+                await interaction.followup.send(
                     "❌ You don't have a profile yet. Use `/register-profile` first.",
                     ephemeral=True
                 )
@@ -99,21 +111,21 @@ class ProfileCog(commands.Cog):
             name = name or current_profile['name']
             skills = skills or current_profile['skills']
             interests = interests or current_profile['interests']
-            
+
             name = validation.validate_name(name)
             skills = validation.validate_skills(skills)
             interests = validation.validate_interests(interests)
-            
+
             discord_username = f"{interaction.user.name}"
-            
+
             db.upsert_profile(
-                discord_id, 
-                discord_username, 
-                name, 
-                skills, 
+                discord_id,
+                discord_username,
+                name,
+                skills,
                 interests
             )
-            
+
             profile = {
                 'name': name,
                 'discord_username': discord_username,
@@ -121,25 +133,31 @@ class ProfileCog(commands.Cog):
                 'interests': interests
             }
             embed = profile_embed(profile)
-            
-            await interaction.response.send_message(
-                embed=embed, 
+
+            await interaction.followup.send(
+                embed=embed,
                 ephemeral=True,
                 content="✅ Profile updated successfully!"
             )
             self.logger.info(f"Profile updated for {discord_username}")
-            
+
         except ValueError as e:
-            await interaction.response.send_message(
-                f"❌ Validation error: {str(e)}", 
-                ephemeral=True
-            )
+            try:
+                await interaction.followup.send(
+                    f"❌ Validation error: {str(e)}",
+                    ephemeral=True
+                )
+            except Exception as followup_error:
+                self.logger.error(f"Failed to send followup: {followup_error}")
         except Exception as e:
             self.logger.error(f"Profile edit error: {str(e)}")
-            await interaction.response.send_message(
-                "❌ Failed to update profile. Please try again later.", 
-                ephemeral=True
-            )
+            try:
+                await interaction.followup.send(
+                    "❌ Failed to update profile. Please try again later.",
+                    ephemeral=True
+                )
+            except Exception as followup_error:
+                self.logger.error(f"Failed to send followup: {followup_error}")
 
     @app_commands.command(
         name="view-profile",
@@ -150,16 +168,19 @@ class ProfileCog(commands.Cog):
         interaction: discord.Interaction
     ):
         try:
+            # Defer the response since we do database operations
+            await interaction.response.defer(ephemeral=True)
+
             discord_id = str(interaction.user.id)
             profile = db.get_profile(discord_id)
-            
+
             if not profile:
-                await interaction.response.send_message(
+                await interaction.followup.send(
                     "❌ You don't have a profile yet. Use `/register-profile` to create one.",
                     ephemeral=True
                 )
                 return
-            
+
             profile_data = {
                 'name': profile['name'],
                 'discord_username': profile['discord_username'],
@@ -167,19 +188,22 @@ class ProfileCog(commands.Cog):
                 'interests': profile['interests']
             }
             embed = profile_embed(profile_data)
-            
-            await interaction.response.send_message(
-                embed=embed, 
+
+            await interaction.followup.send(
+                embed=embed,
                 ephemeral=True
             )
             self.logger.info(f"Profile viewed by {profile['discord_username']}")
-            
+
         except Exception as e:
             self.logger.error(f"Profile view error: {str(e)}")
-            await interaction.response.send_message(
-                "❌ Failed to retrieve profile. Please try again later.", 
-                ephemeral=True
-            )
+            try:
+                await interaction.followup.send(
+                    "❌ Failed to retrieve profile. Please try again later.",
+                    ephemeral=True
+                )
+            except Exception as followup_error:
+                self.logger.error(f"Failed to send followup: {followup_error}")
 
 async def setup(bot):
     await bot.add_cog(ProfileCog(bot))
