@@ -25,17 +25,23 @@ class Database:
     def get_connection(self):
         """Return a connection depending on mode (Postgres or SQLite)."""
         self.lock.acquire()
+        conn = None
         try:
             if self.mode == "postgres":
                 conn = psycopg2.connect(self.database_url, sslmode="require")
                 conn.autocommit = True
             else:
+                # ensure data/ folder exists for SQLite
+                os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
                 conn = sqlite3.connect(self.db_path)
                 conn.row_factory = sqlite3.Row
                 conn.execute("PRAGMA foreign_keys = ON")
+
             yield conn
+
         finally:
-            conn.close()
+            if conn is not None:
+                conn.close()
             self.lock.release()
 
     def setup_database(self):
