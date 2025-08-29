@@ -11,7 +11,6 @@ class TemplateManager:
     def __init__(self):
         self.logger = logging.getLogger(__name__)
         self.db = email_db
-        self._seed_templates()
         
     async def get_template(self, category: str, template_name: str) -> Optional[Template]:
         """Retrieve specific template by category and name."""
@@ -297,7 +296,7 @@ class TemplateManager:
         self.logger.info(f"Bulk import completed: {success_count} success, {error_count} errors")
         return success_count, error_count, errors
 
-    def _seed_templates(self):
+    async def seed_templates_async(self):
         """Seed the database with default templates if not already present."""
         try:
             # Check if templates are already seeded by counting existing templates
@@ -317,7 +316,7 @@ class TemplateManager:
             for template_dict in template_data:
                 try:
                     # Create template using the existing add_template method
-                    template = self.add_template(
+                    template = await self.add_template(
                         category=template_dict['category'],
                         name=template_dict['name'],
                         subject=template_dict['subject'],

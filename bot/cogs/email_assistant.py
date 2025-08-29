@@ -196,6 +196,9 @@ class EmailAssistantCog(commands.Cog):
         else:
             self.logger.info("Email sending enabled - Resend API connected")
 
+        # Seed templates if needed
+        await self.template_manager.seed_templates_async()
+
         await self._preload_popular_templates()
         self.logger.info("Email Assistant loaded with advanced features")
 

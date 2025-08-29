@@ -3,12 +3,66 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
-*.env
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Environment and secrets
+.env
+.env.local
+.env.production
+.env.staging
+*.key
+*.pem
+secrets.json
+
+# Databases
 *.db
-*.log
+*.sqlite
 *.sqlite3
-env/
-.vscode/
-.kiro/
 data/
+logs/
+
+# Logs
+*.log
+logs/
+bot.log
+bot.log.*
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+.pytest_cache/
+
+# Distribution
 feedback.csv

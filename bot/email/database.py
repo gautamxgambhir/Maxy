@@ -14,11 +14,12 @@ class EmailDatabase:
     def __init__(self):
         self.lock = threading.Lock()
         self.database_url = Config.EMAIL_DATABASE_URL
+        self.db_path = Config.EMAIL_DATABASE_PATH
+
         if self.database_url:
             self.mode = "postgres"
         else:
             self.mode = "sqlite"
-            self.db_path = Config.EMAIL_DATABASE_PATH
             os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
 
         self.setup_database()
@@ -29,9 +30,21 @@ class EmailDatabase:
         conn = None
         try:
             if self.mode == "postgres":
-                conn = psycopg2.connect(self.database_url, sslmode="require")
-                conn.autocommit = True
+                try:
+                    conn = psycopg2.connect(self.database_url, sslmode="require")
+                    conn.autocommit = True
+                except Exception as e:
+                    logger.warning(f"PostgreSQL connection failed: {str(e)}")
+                    logger.info("Falling back to SQLite...")
+                    self.mode = "sqlite"
+                    # ensure data/ folder exists for SQLite
+                    os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
+                    conn = sqlite3.connect(self.db_path)
+                    conn.row_factory = sqlite3.Row
+                    conn.execute("PRAGMA foreign_keys = ON")
             else:
+                # ensure data/ folder exists for SQLite
+                os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
                 conn = sqlite3.connect(self.db_path)
                 conn.row_factory = sqlite3.Row
                 conn.execute("PRAGMA foreign_keys = ON")
@@ -44,43 +57,87 @@ class EmailDatabase:
     def setup_database(self):
         try:
             with self.get_connection() as conn:
+                # Check mode after potential fallback in get_connection
+                is_postgres = self.mode == "postgres"
                 cursor = conn.cursor(
                     cursor_factory=psycopg2.extras.RealDictCursor
-                ) if self.mode == "postgres" else conn.cursor()
+                ) if is_postgres else conn.cursor()
 
-                cursor.execute('''
-                    CREATE TABLE IF NOT EXISTS email_templates (
-                        id TEXT PRIMARY KEY,
-                        category TEXT NOT NULL,
-                        name TEXT NOT NULL,
-                        subject TEXT NOT NULL,
-                        body TEXT NOT NULL,
-                        tone TEXT DEFAULT 'formal',
-                        placeholders TEXT DEFAULT '[]',
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        UNIQUE(category, name)
-                    )
-                ''')
+                # Handle timestamp syntax differences
+                timestamp_default = "CURRENT_TIMESTAMP" if is_postgres else "datetime('now')"
 
-                cursor.execute('''
-                    CREATE TABLE IF NOT EXISTS email_logs (
-                        id TEXT PRIMARY KEY,
-                        template_id TEXT,
-                        template_name TEXT NOT NULL,
-                        recipient_email_hash TEXT NOT NULL,
-                        recipient_name TEXT NOT NULL,
-                        status TEXT NOT NULL,
-                        error_message TEXT,
-                        sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        sent_by BIGINT NOT NULL
-                    )
-                ''')
+                # Create email_templates table
+                if is_postgres:
+                    cursor.execute('''
+                        CREATE TABLE IF NOT EXISTS email_templates (
+                            id TEXT PRIMARY KEY,
+                            category TEXT NOT NULL,
+                            name TEXT NOT NULL,
+                            subject TEXT NOT NULL,
+                            body TEXT NOT NULL,
+                            tone TEXT DEFAULT 'formal',
+                            placeholders TEXT DEFAULT '[]',
+                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                        )
+                    ''')
+                    cursor.execute('''
+                        CREATE UNIQUE INDEX IF NOT EXISTS idx_email_templates_category_name
+                        ON email_templates(category, name)
+                    ''')
+                else:
+                    cursor.execute('''
+                        CREATE TABLE IF NOT EXISTS email_templates (
+                            id TEXT PRIMARY KEY,
+                            category TEXT NOT NULL,
+                            name TEXT NOT NULL,
+                            subject TEXT NOT NULL,
+                            body TEXT NOT NULL,
+                            tone TEXT DEFAULT 'formal',
+                            placeholders TEXT DEFAULT '[]',
+                            created_at TEXT DEFAULT (datetime('now')),
+                            updated_at TEXT DEFAULT (datetime('now'))
+                        )
+                    ''')
+                    cursor.execute('''
+                        CREATE UNIQUE INDEX IF NOT EXISTS idx_email_templates_category_name
+                        ON email_templates(category, name)
+                    ''')
 
-                if self.mode == "sqlite":
+                # Create email_logs table
+                if is_postgres:
+                    cursor.execute('''
+                        CREATE TABLE IF NOT EXISTS email_logs (
+                            id TEXT PRIMARY KEY,
+                            template_id TEXT,
+                            template_name TEXT NOT NULL,
+                            recipient_email_hash TEXT NOT NULL,
+                            recipient_name TEXT NOT NULL,
+                            status TEXT NOT NULL,
+                            error_message TEXT,
+                            sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            sent_by BIGINT NOT NULL
+                        )
+                    ''')
+                else:
+                    cursor.execute('''
+                        CREATE TABLE IF NOT EXISTS email_logs (
+                            id TEXT PRIMARY KEY,
+                            template_id TEXT,
+                            template_name TEXT NOT NULL,
+                            recipient_email_hash TEXT NOT NULL,
+                            recipient_name TEXT NOT NULL,
+                            status TEXT NOT NULL,
+                            error_message TEXT,
+                            sent_at TEXT DEFAULT (datetime('now')),
+                            sent_by INTEGER NOT NULL
+                        )
+                    ''')
+
+                if not is_postgres:
                     conn.commit()
 
-            logger.info("Email Assistant database setup complete")
+            logger.info(f"Email Assistant database setup complete (using {'PostgreSQL' if is_postgres else 'SQLite'})")
         except Exception as e:
             logger.error(f"Email Assistant database setup failed: {str(e)}")
             raise
