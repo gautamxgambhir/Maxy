@@ -189,6 +189,19 @@ class EmailAssistantCog(commands.Cog):
         self.user_context = {}
         self.template_cache = {}
 
+    async def _safe_send(self, interaction: discord.Interaction, *args, **kwargs):
+        """Send a response safely whether or not the interaction is already acknowledged."""
+        try:
+            if interaction.response.is_done():
+                return await interaction.followup.send(*args, **kwargs)
+            else:
+                return await interaction.response.send_message(*args, **kwargs)
+        except (discord.errors.InteractionResponded, discord.errors.HTTPException):
+            try:
+                return await interaction.followup.send(*args, **kwargs)
+            except Exception as inner_e:
+                self.logger.warning(f"Safe send failed: {inner_e}")
+
     async def cog_load(self):
         """Initialize when loaded."""
         if not self.resend_client:
@@ -256,24 +269,22 @@ class EmailAssistantCog(commands.Cog):
             elif action == "help":
                 await self._handle_help(interaction)
             else:
-                try:
-                    await interaction.followup.send(
-                        "❌ Invalid action selected.",
-                        ephemeral=True
-                    )
-                except (discord.errors.InteractionResponded, discord.errors.NotFound):
-                    self.logger.warning("Could not send invalid action response - interaction already handled")
+                await self._safe_send(
+                    interaction,
+                    "❌ Invalid action selected.",
+                    ephemeral=True
+                )
 
         except Exception as e:
-            self.logger.error(f"Email command error: {e}")
+            self.logger.exception(f"Email command error: {e}")
             try:
-                if not interaction.is_expired():
-                    await interaction.followup.send(
-                        "❌ An error occurred. Please try again later.",
-                        ephemeral=True
-                    )
-            except Exception as followup_error:
-                self.logger.error(f"Failed to send error followup: {followup_error}")
+                await self._safe_send(
+                    interaction,
+                    "❌ An error occurred. Please try again later.",
+                    ephemeral=True
+                )
+            except Exception:
+                pass
 
     async def _handle_browse_templates(self, interaction: discord.Interaction,
                                      category: Optional[str] = None):
@@ -283,7 +294,8 @@ class EmailAssistantCog(commands.Cog):
                 templates = await self.template_manager.get_available_templates(category)
                 if not templates:
                     try:
-                        await interaction.followup.send(
+                        await self._safe_send(
+                            interaction,
                             f"📭 No templates found in category: **{category}**",
                             ephemeral=True
                         )
@@ -306,7 +318,7 @@ class EmailAssistantCog(commands.Cog):
                     embed.set_footer(text=f"Showing 10 of {len(templates)} templates")
 
                 try:
-                    await interaction.followup.send(embed=embed, ephemeral=True)
+                    await self._safe_send(interaction, embed=embed, ephemeral=True)
                 except (discord.errors.InteractionResponded, discord.errors.NotFound):
                     self.logger.warning("Could not send browse templates response - interaction already handled")
 
@@ -327,7 +339,7 @@ class EmailAssistantCog(commands.Cog):
                     )
 
                 try:
-                    await interaction.followup.send(embed=embed, ephemeral=True)
+                    await self._safe_send(interaction, embed=embed, ephemeral=True)
                 except (discord.errors.InteractionResponded, discord.errors.NotFound):
                     self.logger.warning("Could not send categories response - interaction already handled")
 
@@ -335,7 +347,7 @@ class EmailAssistantCog(commands.Cog):
             self.logger.error(f"Browse templates error: {e}")
             try:
                 if not interaction.is_expired():
-                    await interaction.followup.send(
+                    await self._safe_send(interaction,
                         "❌ Failed to browse templates.",
                         ephemeral=True
                     )
@@ -347,7 +359,7 @@ class EmailAssistantCog(commands.Cog):
         try:
             if not self.resend_client:
                 try:
-                    await interaction.followup.send(
+                    await self._safe_send(interaction,
                         "❌ Email sending is not configured. Please set up RESEND_API_KEY in your environment.",
                         ephemeral=True
                     )
@@ -372,7 +384,7 @@ class EmailAssistantCog(commands.Cog):
             embed.set_footer(text="Use the command with the category parameter to continue")
 
             try:
-                await interaction.followup.send(embed=embed, ephemeral=True)
+                await self._safe_send(interaction,embed=embed, ephemeral=True)
             except (discord.errors.InteractionResponded, discord.errors.NotFound):
                 self.logger.warning("Could not send send email workflow response - interaction already handled")
 
@@ -380,7 +392,7 @@ class EmailAssistantCog(commands.Cog):
             self.logger.error(f"Send email workflow error: {e}")
             try:
                 if not interaction.is_expired():
-                    await interaction.followup.send(
+                    await self._safe_send(interaction,
                         "❌ Failed to start email workflow.",
                         ephemeral=True
                     )
@@ -432,12 +444,12 @@ class EmailAssistantCog(commands.Cog):
                     inline=False
                 )
 
-            await interaction.followup.send(embed=embed, ephemeral=True)
+            await self._safe_send(interaction,embed=embed, ephemeral=True)
 
         except Exception as e:
             self.logger.error(f"View stats error: {e}")
             try:
-                await interaction.followup.send(
+                await self._safe_send(interaction,
                     "❌ Failed to load statistics.",
                     ephemeral=True
                 )
@@ -450,7 +462,7 @@ class EmailAssistantCog(commands.Cog):
             logs = await self.email_logger.get_logs({'limit': 10, 'sent_by': interaction.user.id})
 
             if not logs:
-                await interaction.followup.send(
+                await self._safe_send(interaction,
                     "📭 No email history found.",
                     ephemeral=True
                 )
@@ -469,12 +481,12 @@ class EmailAssistantCog(commands.Cog):
                     inline=False
                 )
 
-            await interaction.followup.send(embed=embed, ephemeral=True)
+            await self._safe_send(interaction,embed=embed, ephemeral=True)
 
         except Exception as e:
             self.logger.error(f"View history error: {e}")
             try:
-                await interaction.followup.send(
+                await self._safe_send(interaction,
                     "❌ Failed to load email history.",
                     ephemeral=True
                 )
@@ -514,12 +526,12 @@ class EmailAssistantCog(commands.Cog):
                 inline=False
             )
 
-            await interaction.followup.send(embed=embed, ephemeral=True)
+            await self._safe_send(interaction,embed=embed, ephemeral=True)
 
         except Exception as e:
             self.logger.error(f"Manage templates error: {e}")
             try:
-                await interaction.followup.send(
+                await self._safe_send(interaction,
                     "❌ Failed to show template management options.",
                     ephemeral=True
                 )
@@ -561,12 +573,12 @@ class EmailAssistantCog(commands.Cog):
 
             embed.set_footer(text="💡 Tip: Use /email action:help anytime for this guide")
 
-            await interaction.followup.send(embed=embed, ephemeral=True)
+            await self._safe_send(interaction,embed=embed, ephemeral=True)
 
         except Exception as e:
             self.logger.error(f"Help error: {e}")
             try:
-                await interaction.followup.send(
+                await self._safe_send(interaction,
                     "❌ Failed to show help.",
                     ephemeral=True
                 )
@@ -599,7 +611,7 @@ class EmailAssistantCog(commands.Cog):
 
             if not self.resend_client:
                 try:
-                    await interaction.followup.send(
+                    await self._safe_send(interaction,
                         "❌ Email sending is not configured.",
                         ephemeral=True
                     )
@@ -610,7 +622,7 @@ class EmailAssistantCog(commands.Cog):
             email_template = await self.template_manager.get_template(category, template)
             if not email_template:
                 try:
-                    await interaction.followup.send(
+                    await self._safe_send(interaction,
                         f"❌ Template not found: **{category}/{template}**",
                         ephemeral=True
                     )
@@ -662,7 +674,7 @@ class EmailAssistantCog(commands.Cog):
                 )
 
             try:
-                await interaction.followup.send(embed=embed, ephemeral=True)
+                await self._safe_send(interaction,embed=embed, ephemeral=True)
             except (discord.errors.InteractionResponded, discord.errors.NotFound):
                 self.logger.warning("Could not send email result - interaction already handled")
 
@@ -670,7 +682,7 @@ class EmailAssistantCog(commands.Cog):
             self.logger.error(f"Email send error: {e}")
             try:
                 if not interaction.is_expired():
-                    await interaction.followup.send(
+                    await self._safe_send(interaction,
                         "❌ Failed to send email.",
                         ephemeral=True
                     )
@@ -700,7 +712,7 @@ class EmailAssistantCog(commands.Cog):
 
             email_template = await self.template_manager.get_template(category, template)
             if not email_template:
-                await interaction.followup.send(
+                await self._safe_send(interaction,
                     f"❌ Template not found: **{category}/{template}**",
                     ephemeral=True
                 )
@@ -737,12 +749,12 @@ class EmailAssistantCog(commands.Cog):
                 inline=False
             )
 
-            await interaction.followup.send(embed=embed, ephemeral=True)
+            await self._safe_send(interaction,embed=embed, ephemeral=True)
 
         except Exception as e:
             self.logger.error(f"Email copy error: {e}")
             try:
-                await interaction.followup.send(
+                await self._safe_send(interaction,
                     "❌ Failed to generate email draft.",
                     ephemeral=True
                 )
@@ -771,7 +783,7 @@ class EmailAssistantCog(commands.Cog):
                 templates = await self.template_manager.get_available_templates(category)
                 if not templates:
                     try:
-                        await interaction.followup.send(
+                        await self._safe_send(interaction,
                             f"📭 No templates found in category: **{category}**",
                             ephemeral=True
                         )
@@ -810,7 +822,7 @@ class EmailAssistantCog(commands.Cog):
                     )
 
             try:
-                await interaction.followup.send(embed=embed, ephemeral=True)
+                await self._safe_send(interaction,embed=embed, ephemeral=True)
             except (discord.errors.InteractionResponded, discord.errors.NotFound):
                 self.logger.warning("Could not send list templates response - interaction already handled")
 
@@ -818,7 +830,7 @@ class EmailAssistantCog(commands.Cog):
             self.logger.error(f"Email list error: {e}")
             try:
                 if not interaction.is_expired():
-                    await interaction.followup.send(
+                    await self._safe_send(interaction,
                         "❌ Failed to list templates.",
                         ephemeral=True
                     )
@@ -848,7 +860,7 @@ class EmailAssistantCog(commands.Cog):
 
             email_template = await self.template_manager.get_template(category, template)
             if not email_template:
-                await interaction.followup.send(
+                await self._safe_send(interaction,
                     f"❌ Template not found: **{category}/{template}**",
                     ephemeral=True
                 )
@@ -897,12 +909,12 @@ class EmailAssistantCog(commands.Cog):
                 inline=False
             )
 
-            await interaction.followup.send(embed=embed, ephemeral=True)
+            await self._safe_send(interaction,embed=embed, ephemeral=True)
 
         except Exception as e:
             self.logger.error(f"Email preview error: {e}")
             try:
-                await interaction.followup.send(
+                await self._safe_send(interaction,
                     "❌ Failed to generate preview.",
                     ephemeral=True
                 )
@@ -973,12 +985,12 @@ class EmailAssistantCog(commands.Cog):
                     color=discord.Color.red()
                 )
 
-            await interaction.followup.send(embed=embed, ephemeral=True)
+            await self._safe_send(interaction,embed=embed, ephemeral=True)
 
         except Exception as e:
             self.logger.error(f"Create template error: {e}")
             try:
-                await interaction.followup.send(
+                await self._safe_send(interaction,
                     "❌ Failed to create template.",
                     ephemeral=True
                 )
@@ -1018,7 +1030,7 @@ class EmailAssistantCog(commands.Cog):
 
             existing_template = await self.template_manager.get_template(category, name)
             if not existing_template:
-                await interaction.followup.send(
+                await self._safe_send(interaction,
                     f"❌ Template not found: **{category}/{name}**",
                     ephemeral=True
                 )
@@ -1033,7 +1045,7 @@ class EmailAssistantCog(commands.Cog):
                 updates['tone'] = new_tone
 
             if not updates:
-                await interaction.followup.send(
+                await self._safe_send(interaction,
                     "⚠️ No changes specified. Use the parameters to update subject, body, or tone.",
                     ephemeral=True
                 )
@@ -1068,12 +1080,12 @@ class EmailAssistantCog(commands.Cog):
                     color=discord.Color.red()
                 )
 
-            await interaction.followup.send(embed=embed, ephemeral=True)
+            await self._safe_send(interaction,embed=embed, ephemeral=True)
 
         except Exception as e:
             self.logger.error(f"Edit template error: {e}")
             try:
-                await interaction.followup.send(
+                await self._safe_send(interaction,
                     "❌ Failed to update template.",
                     ephemeral=True
                 )
@@ -1110,12 +1122,12 @@ class EmailAssistantCog(commands.Cog):
                     description=f"To delete template **{category}/{name}**, type `DELETE` in the confirm parameter.",
                     color=discord.Color.orange()
                 )
-                await interaction.followup.send(embed=embed, ephemeral=True)
+                await self._safe_send(interaction,embed=embed, ephemeral=True)
                 return
 
             template = await self.template_manager.get_template(category, name)
             if not template:
-                await interaction.followup.send(
+                await self._safe_send(interaction,
                     f"❌ Template not found: **{category}/{name}**",
                     ephemeral=True
                 )
@@ -1136,12 +1148,12 @@ class EmailAssistantCog(commands.Cog):
                     color=discord.Color.red()
                 )
 
-            await interaction.followup.send(embed=embed, ephemeral=True)
+            await self._safe_send(interaction,embed=embed, ephemeral=True)
 
         except Exception as e:
             self.logger.error(f"Delete template error: {e}")
             try:
-                await interaction.followup.send(
+                await self._safe_send(interaction,
                     "❌ Failed to delete template.",
                     ephemeral=True
                 )
