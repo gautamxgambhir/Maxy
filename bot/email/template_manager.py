@@ -13,44 +13,44 @@ class TemplateManager:
         self.db = email_db
         
     async def get_template(self, category: str, template_name: str) -> Optional[Template]:
-        """Retrieve specific template by category and name."""
-        try:
-            row = self.db.get_template_by_name(category, template_name)
-            if row:
-                return Template.from_dict(dict(row))
-            return None
-        except Exception as e:
-            self.logger.error(f"Failed to get template {category}/{template_name}: {str(e)}")
-            return None
+       """Retrieve specific template by category and name."""
+       try:
+           row = self.db.get_template_by_name(category, template_name)
+           if row:
+               return Template.from_dict(self.db._row_to_dict(row))
+           return None
+       except Exception as e:
+           self.logger.error(f"Failed to get template {category}/{template_name}: {str(e)}")
+           return None
     
     async def get_template_by_id(self, template_id: str) -> Optional[Template]:
-        """Retrieve specific template by ID."""
-        try:
-            row = self.db.get_template(template_id)
-            if row:
-                return Template.from_dict(dict(row))
-            return None
-        except Exception as e:
-            self.logger.error(f"Failed to get template by ID {template_id}: {str(e)}")
-            return None
+       """Retrieve specific template by ID."""
+       try:
+           row = self.db.get_template(template_id)
+           if row:
+               return Template.from_dict(self.db._row_to_dict(row))
+           return None
+       except Exception as e:
+           self.logger.error(f"Failed to get template by ID {template_id}: {str(e)}")
+           return None
         
     async def get_available_templates(self, category: str) -> List[Template]:
-        """List templates by category."""
-        try:
-            rows = self.db.get_templates_by_category(category)
-            return [Template.from_dict(dict(row)) for row in rows]
-        except Exception as e:
-            self.logger.error(f"Failed to get templates for category {category}: {str(e)}")
-            return []
+       """List templates by category."""
+       try:
+           rows = self.db.get_templates_by_category(category)
+           return [Template.from_dict(self.db._row_to_dict(row)) for row in rows]
+       except Exception as e:
+           self.logger.error(f"Failed to get templates for category {category}: {str(e)}")
+           return []
     
     async def get_all_templates(self) -> List[Template]:
-        """Get all templates."""
-        try:
-            rows = self.db.get_all_templates()
-            return [Template.from_dict(dict(row)) for row in rows]
-        except Exception as e:
-            self.logger.error(f"Failed to get all templates: {str(e)}")
-            return []
+       """Get all templates."""
+       try:
+           rows = self.db.get_all_templates()
+           return [Template.from_dict(self.db._row_to_dict(row)) for row in rows]
+       except Exception as e:
+           self.logger.error(f"Failed to get all templates: {str(e)}")
+           return []
     
     async def get_templates_by_category_dict(self) -> Dict[str, List[Template]]:
         """Get all templates organized by category."""
