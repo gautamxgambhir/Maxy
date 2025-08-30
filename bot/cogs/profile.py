@@ -356,79 +356,7 @@ class ProfileActionView(discord.ui.View):
                 )
                 await interaction.edit_original_response(embed=embed, view=None)
 
-class ProfileEditModal(discord.ui.Modal, title="Edit Your Profile"):
-    """Modal for editing profile information."""
-    
-    name = discord.ui.TextInput(
-        label="Full Name",
-        placeholder="Enter your full name...",
-        required=True,
-        max_length=100
-    )
-    
-    skills = discord.ui.TextInput(
-        label="Skills (comma separated)",
-        placeholder="Python, JavaScript, UI/UX Design...",
-        required=False,
-        max_length=500,
-        style=discord.TextStyle.paragraph
-    )
-    
-    interests = discord.ui.TextInput(
-        label="Interests (comma separated)",
-        placeholder="Machine Learning, Web Development, Gaming...",
-        required=False,
-        max_length=500,
-        style=discord.TextStyle.paragraph
-    )
-    
-    async def on_submit(self, interaction: discord.Interaction):
-        try:
-            # Validate inputs
-            validated_name = validation.validate_name(self.name.value)
-            validated_skills = validation.validate_skills(self.skills.value)
-            validated_interests = validation.validate_interests(self.interests.value)
-            
-            discord_id = str(interaction.user.id)
-            discord_username = interaction.user.name
-            
-            # Update profile
-            db.upsert_profile(
-                discord_id,
-                discord_username,
-                validated_name,
-                validated_skills,
-                validated_interests
-            )
-            
-            # Create updated profile embed
-            profile_data = {
-                'name': validated_name,
-                'discord_username': discord_username,
-                'skills': validated_skills,
-                'interests': validated_interests
-            }
-            
-            embed = profile_embed(profile_data)
-            embed.title = "✅ Profile Updated Successfully!"
-            
-            view = ProfileActionView(discord_id)
-            await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
-            
-        except ValueError as e:
-            embed = error_embed(
-                "Validation Error",
-                str(e),
-                "Please check your input and try again."
-            )
-            await interaction.response.send_message(embed=embed, ephemeral=True)
-        except Exception as e:
-            logging.getLogger(__name__).error(f"Profile edit error: {e}")
-            embed = error_embed(
-                "Update Failed",
-                "Failed to update your profile. Please try again later."
-            )
-            await interaction.response.send_message(embed=embed, ephemeral=True)
+
 
 class ProfileCog(commands.Cog):
     def __init__(self, bot):
@@ -486,14 +414,8 @@ class ProfileCog(commands.Cog):
         if not profile:
             raise ProfileNotFoundError()
         
-        # Show edit modal
-        modal = ProfileEditModal()
-        
-        # Pre-fill modal with current values
-        modal.name.default = profile['name']
-        modal.skills.default = profile.get('skills', '')
-        modal.interests.default = profile.get('interests', '')
-        
+        # Show edit modal with current profile data
+        modal = ProfileEditModal(profile)
         await interaction.response.send_modal(modal)
 
     @app_commands.command(

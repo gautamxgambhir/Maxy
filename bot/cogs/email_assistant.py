@@ -88,22 +88,11 @@ class EmailCompositionModal(discord.ui.Modal, title="📧 Compose Email"):
             style=discord.TextStyle.paragraph
         )
         
-        # Add subject and body preview fields
-        self.subject_preview = discord.ui.TextInput(
-            label="Subject Preview",
-            placeholder="Email subject will appear here...",
-            required=False,
-            max_length=200,
-            style=discord.TextStyle.short
-        )
+        # Add all fields to the modal
+        for text_input in self.placeholder_inputs.values():
+            self.add_item(text_input)
         
-        self.body_preview = discord.ui.TextInput(
-            label="Body Preview",
-            placeholder="Email body will appear here...",
-            required=False,
-            max_length=1000,
-            style=discord.TextStyle.paragraph
-        )
+        self.add_item(self.custom_message)
 
     async def on_submit(self, interaction: discord.Interaction):
         """Handle modal submission."""
@@ -113,19 +102,26 @@ class EmailCompositionModal(discord.ui.Modal, title="📧 Compose Email"):
             for key, text_input in self.placeholder_inputs.items():
                 placeholder_values[key] = getattr(self, key).value
             
-            # Process template with placeholders
-            processed_template = await placeholder_processor.process_template(
-                self.template, 
-                placeholder_values
-            )
+            # Fill placeholders in the template
+            filled_subject = self.template.subject
+            filled_body = self.template.body
             
-            # Update preview fields
-            self.subject_preview.value = processed_template.get('subject', 'Subject not available')
-            self.body_preview.value = processed_template.get('body', 'Body not available')
+            # Simple placeholder replacement
+            for key, value in placeholder_values.items():
+                placeholder = f"{{{key}}}"
+                filled_subject = filled_subject.replace(placeholder, value)
+                filled_body = filled_body.replace(placeholder, value)
+            
+            # Add custom message if provided
+            if self.custom_message.value:
+                filled_body += f"\n\n{self.custom_message.value}"
             
             # Create confirmation view
             view = EmailConfirmationView(
-                processed_template, 
+                {
+                    'subject': filled_subject,
+                    'body': filled_body
+                }, 
                 placeholder_values, 
                 self.template,
                 self.category
@@ -139,11 +135,11 @@ class EmailCompositionModal(discord.ui.Modal, title="📧 Compose Email"):
             
             embed.add_field(
                 name="📨 Subject",
-                value=processed_template.get('subject', 'No subject'),
+                value=filled_subject,
                 inline=False
             )
             
-            body_preview = processed_template.get('body', 'No body')
+            body_preview = filled_body
             if len(body_preview) > 1024:
                 body_preview = body_preview[:1021] + "..."
             
@@ -1083,86 +1079,30 @@ class EmailAssistantCog(commands.Cog):
     )
     @app_commands.describe(
         category="Template category",
-        template="Template name",
-        recipient_email="Recipient email address",
-        recipient_name="Recipient name",
-        placeholders="Placeholder values (optional, format: key:value,key:value)"
+        template="Template name"
     )
     async def email_send_command(self, interaction: discord.Interaction,
-                                category: str, template: str,
-                                recipient_email: str, recipient_name: str,
-                                placeholders: Optional[str] = None):
-        """Send email using template."""
+                                category: str, template: str):
+        """Send email using template via modal."""
         try:
-            # no explicit defer here; top-level command defers once
             if not self.resend_client:
-                try:
-                    await self._safe_send(interaction,
-                        "❌ Email sending is not configured.",
-                        ephemeral=True
-                    )
-                except (discord.errors.InteractionResponded, discord.errors.NotFound):
-                    self.logger.warning("Could not send email config error - interaction already handled")
+                await self._safe_send(interaction,
+                    "❌ Email sending is not configured.",
+                    ephemeral=True
+                )
                 return
 
             email_template = await self.template_manager.get_template(category, template)
             if not email_template:
-                try:
-                    await self._safe_send(interaction,
-                        f"❌ Template not found: **{category}/{template}**",
-                        ephemeral=True
-                    )
-                except (discord.errors.InteractionResponded, discord.errors.NotFound):
-                    self.logger.warning("Could not send template not found error - interaction already handled")
+                await self._safe_send(interaction,
+                    f"❌ Template not found: **{category}/{template}**",
+                    ephemeral=True
+                )
                 return
 
-            placeholder_values = {}
-            if placeholders:
-                for pair in placeholders.split(','):
-                    if ':' in pair:
-                        key, value = pair.split(':', 1)
-                        placeholder_values[key.strip()] = value.strip()
-
-            filled_subject = self.placeholder_processor.fill_placeholders(
-                email_template.subject, placeholder_values
-            )
-            filled_body = self.placeholder_processor.fill_placeholders(
-                email_template.body, placeholder_values
-            )
-
-            result = await self.resend_client.send_email(
-                to=recipient_email,
-                subject=filled_subject,
-                body=filled_body
-            )
-
-            await self.email_logger.log_email(
-                template_id=email_template.id,
-                template_name=email_template.name,
-                recipient_email=recipient_email,
-                recipient_name=recipient_name,
-                status="sent" if result['success'] else "failed",
-                sent_by=interaction.user.id,
-                error_message=result.get('error')
-            )
-
-            if result['success']:
-                embed = discord.Embed(
-                    title="✅ Email Sent Successfully!",
-                    description=f"**To:** {recipient_name} <{recipient_email}>\n**Template:** {category}/{template}",
-                    color=discord.Color.green()
-                )
-            else:
-                embed = discord.Embed(
-                    title="❌ Email Failed",
-                    description=f"**Error:** {result.get('error', 'Unknown error')}",
-                    color=discord.Color.red()
-                )
-
-            try:
-                await self._safe_send(interaction,embed=embed, ephemeral=True)
-            except (discord.errors.InteractionResponded, discord.errors.NotFound):
-                self.logger.warning("Could not send email result - interaction already handled")
+            # Open the email composition modal
+            modal = EmailCompositionModal(email_template, category)
+            await interaction.response.send_modal(modal)
 
         except Exception as e:
             self.logger.error(f"Email send error: {e}")
@@ -1320,15 +1260,13 @@ class EmailAssistantCog(commands.Cog):
     )
     @app_commands.describe(
         category="Email template category",
-        template="Template name",
-        placeholders="Placeholder values as key:value pairs"
+        template="Template name"
     )
     async def email_preview_command(self, interaction: discord.Interaction,
-                                   category: str, template: str,
-                                   placeholders: str = ""):
-        """Preview email template with filled placeholders."""
+                                   category: str, template: str):
+        """Preview email template with filled placeholders using modal."""
         try:
-            # no explicit defer here; top-level command defers once
+            # Get the template
             email_template = await self.template_manager.get_template(category, template)
             if not email_template:
                 await self._safe_send(interaction,
@@ -1337,56 +1275,15 @@ class EmailAssistantCog(commands.Cog):
                 )
                 return
 
-            placeholder_values = {}
-            if placeholders:
-                for pair in placeholders.split(','):
-                    if ':' in pair:
-                        key, value = pair.split(':', 1)
-                        placeholder_values[key.strip()] = value.strip()
-
-            preview = self.placeholder_processor.preview_filled_template(
-                f"**Subject:** {email_template.subject}\n\n**Body:**\n{email_template.body}",
-                placeholder_values
-            )
-
-            embed = discord.Embed(
-                title=f"👀 Preview - {email_template.name}",
-                description=f"**Category:** {category} | **Tone:** {email_template.tone}",
-                color=discord.Color.blue()
-            )
-
-            embed.add_field(
-                name="📊 Completion Status",
-                value=f"**Filled:** {preview['filled_placeholders']}/{preview['total_placeholders']} "
-                      f"({preview['completion_percentage']:.0f}%)",
-                inline=False
-            )
-
-            if preview['missing_placeholders']:
-                missing_list = [f"• {p}" for p in preview['missing_placeholders']]
-                embed.add_field(
-                    name="⚠️ Missing Placeholders",
-                    value="\n".join(missing_list),
-                    inline=False
-                )
-
-            preview_text = preview['preview']
-            if len(preview_text) > 1000:
-                preview_text = preview_text[:1000] + "..."
-
-            embed.add_field(
-                name="📧 Preview",
-                value=preview_text,
-                inline=False
-            )
-
-            await self._safe_send(interaction,embed=embed, ephemeral=True)
+            # Open the email composition modal
+            modal = EmailCompositionModal(email_template, category)
+            await interaction.response.send_modal(modal)
 
         except Exception as e:
             self.logger.error(f"Email preview error: {e}")
             try:
                 await self._safe_send(interaction,
-                    "❌ Failed to generate preview.",
+                    "❌ Failed to open email composition modal.",
                     ephemeral=True
                 )
             except Exception as followup_error:
