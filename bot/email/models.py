@@ -38,8 +38,8 @@ class Template:
     
     def __post_init__(self):
         self.validate()
-        
-        if not self.placeholders:
+
+        if not self.placeholders or not isinstance(self.placeholders, list):
             self.placeholders = self.extract_placeholders()
     
     def validate(self) -> None:
@@ -135,6 +135,17 @@ class Template:
     
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'Template':
+        placeholders_data = data.get('placeholders', '[]')
+        try:
+            if isinstance(placeholders_data, str):
+                placeholders = json.loads(placeholders_data)
+            elif isinstance(placeholders_data, list):
+                placeholders = placeholders_data
+            else:
+                placeholders = []
+        except (json.JSONDecodeError, TypeError, ValueError):
+            placeholders = []
+
         return cls(
             id=data['id'],
             category=data['category'],
@@ -142,7 +153,7 @@ class Template:
             subject=data['subject'],
             body=data['body'],
             tone=data.get('tone', 'formal'),
-            placeholders=json.loads(data.get('placeholders', '[]')),
+            placeholders=placeholders,
             created_at=datetime.fromisoformat(data['created_at']),
             updated_at=datetime.fromisoformat(data['updated_at'])
         )
