@@ -33,7 +33,7 @@ class MaximallyBot(commands.Bot):
         self.config = Config
         self.start_time = datetime.datetime.utcnow()
         self.logger.info("Intents configured: guilds=%s, members=%s, message_content=%s",
-                         intents.guilds, intents.members, intents.message_content)
+                        intents.guilds, intents.members, intents.message_content)
         self.logger.info("If you still see a message_content warning, enable 'MESSAGE CONTENT INTENT' in the Discord Developer Portal for this bot.")
 
     async def setup_hook(self):
@@ -85,45 +85,59 @@ class MaximallyBot(commands.Bot):
             memory = psutil.virtual_memory()
             memory_usage = f"{memory.percent:.1f}%"
 
-            embed = discord.Embed(
-                title="[BOT] Health Check",
-                color=discord.Color.green()
+            from bot.utils.embed import success_embed
+            
+            embed = success_embed(
+                "Bot Health Check",
+                "All systems operational and running smoothly!"
             )
 
             embed.add_field(
-                name="[SYSTEM] Status",
+                name="💻 System Status",
                 value=f"**Memory Usage:** {memory_usage}\n**Platform:** {platform.system()}",
                 inline=False
             )
 
             embed.add_field(
-                name="[DB] Database",
+                name="🗄️ Database",
                 value=db_status,
                 inline=True
             )
 
             embed.add_field(
-                name="[EMAIL] System",
+                name="📧 Email System",
                 value=email_status,
                 inline=True
             )
 
             embed.add_field(
-                name="[UPTIME] Uptime",
+                name="⏰ Uptime",
                 value=f"<t:{int(self.start_time.timestamp())}:R>",
                 inline=True
             )
 
-            embed.set_footer(text=f"Requested by {interaction.user}")
+            embed.set_footer(text=f"Requested by {interaction.user.name} • Maximally : The global hackathon league")
 
             await interaction.response.send_message(embed=embed, ephemeral=True)
 
         except Exception as e:
             self.logger.error(f"Health check error: {e}")
-            await interaction.response.send_message(
-                "[ERROR] Health check failed",
-                ephemeral=True
+            from bot.utils.embed import error_embed
+            
+            embed = error_embed(
+                "Health Check Failed",
+                "Unable to retrieve system status at this time.",
+                "Please try again in a few moments. If the issue persists, contact support."
             )
+            
+            try:
+                await interaction.response.send_message(embed=embed, ephemeral=True)
+            except:
+                # Fallback to simple message if embed fails
+                await interaction.response.send_message(
+                    "❌ Health check failed - system temporarily unavailable",
+                    ephemeral=True
+                )
 
     async def on_ready(self):
         self.logger.info(f"Logged in as {self.user} (ID: {self.user.id})")
