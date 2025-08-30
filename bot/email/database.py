@@ -37,13 +37,11 @@ class EmailDatabase:
                     logger.warning(f"PostgreSQL connection failed: {str(e)}")
                     logger.info("Falling back to SQLite...")
                     self.mode = "sqlite"
-                    # ensure data/ folder exists for SQLite
                     os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
                     conn = sqlite3.connect(self.db_path)
                     conn.row_factory = sqlite3.Row
                     conn.execute("PRAGMA foreign_keys = ON")
             else:
-                # ensure data/ folder exists for SQLite
                 os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
                 conn = sqlite3.connect(self.db_path)
                 conn.row_factory = sqlite3.Row
@@ -57,16 +55,11 @@ class EmailDatabase:
     def setup_database(self):
         try:
             with self.get_connection() as conn:
-                # Check mode after potential fallback in get_connection
                 is_postgres = self.mode == "postgres"
                 cursor = conn.cursor(
                     cursor_factory=psycopg2.extras.RealDictCursor
                 ) if is_postgres else conn.cursor()
 
-                # Handle timestamp syntax differences
-                timestamp_default = "CURRENT_TIMESTAMP" if is_postgres else "datetime('now')"
-
-                # Create email_templates table
                 if is_postgres:
                     cursor.execute('''
                         CREATE TABLE IF NOT EXISTS email_templates (
@@ -104,7 +97,6 @@ class EmailDatabase:
                         ON email_templates(category, name)
                     ''')
 
-                # Create email_logs table
                 if is_postgres:
                     cursor.execute('''
                         CREATE TABLE IF NOT EXISTS email_logs (
@@ -142,6 +134,18 @@ class EmailDatabase:
             logger.error(f"Email Assistant database setup failed: {str(e)}")
             raise
 
+    # ---------- Utility ---------- #
+
+    def _row_to_dict(self, row):
+        if row is None:
+            return None
+        if self.mode == "postgres":
+            return dict(row)
+        return {key: row[key] for key in row.keys()}
+
+    def _rows_to_dicts(self, rows):
+        return [self._row_to_dict(r) for r in rows if r is not None]
+
     # ---------- Template Methods ---------- #
 
     def create_template(self, template_id: str, category: str, name: str,
@@ -167,16 +171,6 @@ class EmailDatabase:
             logger.error(f"Failed to create template: {str(e)}")
             return False
 
-    def _row_to_dict(self, row):
-        """Safely convert database row to dictionary regardless of backend."""
-        if row is None:
-            return None
-        if self.mode == "postgres":
-            return dict(row)
-        else:
-            # SQLite Row object
-            return {key: row[key] for key in row.keys()}
-
     def get_template(self, template_id: str):
         query = "SELECT * FROM email_templates WHERE id = %s" if self.mode == "postgres" else "SELECT * FROM email_templates WHERE id = ?"
         with self.get_connection() as conn:
@@ -199,7 +193,7 @@ class EmailDatabase:
             cursor = conn.cursor()
             cursor.execute(query, (category,))
             rows = cursor.fetchall()
-            return [self._row_to_dict(row) for row in rows]
+            return self._rows_to_dicts(rows)
 
     def get_all_templates(self):
         query = "SELECT * FROM email_templates ORDER BY category, name"
@@ -207,7 +201,7 @@ class EmailDatabase:
             cursor = conn.cursor()
             cursor.execute(query)
             rows = cursor.fetchall()
-            return [self._row_to_dict(row) for row in rows]
+            return self._rows_to_dicts(rows)
 
     def update_template(self, template_id: str, updates: Dict[str, Any]) -> bool:
         if not updates:
@@ -292,23 +286,20 @@ class EmailDatabase:
             cursor = conn.cursor()
             cursor.execute(query, tuple(params))
             rows = cursor.fetchall()
-            return [self._row_to_dict(row) for row in rows]
+            return self._rows_to_dicts(rows)
 
     def get_email_stats(self) -> Dict[str, Any]:
         with self.get_connection() as conn:
             cursor = conn.cursor()
 
-            # Get total emails
             cursor.execute("SELECT COUNT(*) as count FROM email_logs")
             total_row = cursor.fetchone()
             total = self._row_to_dict(total_row)["count"]
 
-            # Get successful emails
             cursor.execute("SELECT COUNT(*) as count FROM email_logs WHERE status = 'sent'")
             sent_row = cursor.fetchone()
             sent = self._row_to_dict(sent_row)["count"]
 
-            # Get popular templates
             cursor.execute('''
                 SELECT template_name, COUNT(*) as usage_count
                 FROM email_logs
@@ -317,9 +308,8 @@ class EmailDatabase:
                 LIMIT {}
             '''.format("%s" if self.mode == "postgres" else "?"), (5,))
             popular_rows = cursor.fetchall()
-            popular = [self._row_to_dict(row) for row in popular_rows]
+            popular = self._rows_to_dicts(popular_rows)
 
-            # Get recent activity
             cursor.execute('''
                 SELECT COUNT(*) as count FROM email_logs
                 WHERE sent_at >= (CURRENT_TIMESTAMP - INTERVAL '7 days')
