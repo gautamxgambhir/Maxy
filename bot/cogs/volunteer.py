@@ -17,54 +17,63 @@ class VolunteerTaskCreationModal(discord.ui.Modal, title="🤝 Create Volunteer 
     
     def __init__(self):
         super().__init__()
-    
-    task_title = discord.ui.TextInput(
-        label="Task Title",
-        placeholder="Enter a clear, descriptive title for the task",
-        required=True,
-        max_length=100,
-        style=discord.TextStyle.short
-    )
-    
-    task_description = discord.ui.TextInput(
-        label="Task Description",
-        placeholder="Describe what needs to be done, requirements, and expectations...",
-        required=True,
-        max_length=1000,
-        style=discord.TextStyle.paragraph
-    )
-    
-    required_skills = discord.ui.TextInput(
-        label="Required Skills (Optional)",
-        placeholder="What skills are needed? (e.g., Photography, Social Media, Technical Support)",
-        required=False,
-        max_length=300,
-        style=discord.TextStyle.short
-    )
-    
-    time_commitment = discord.ui.TextInput(
-        label="Time Commitment",
-        placeholder="How long will this take? (e.g., 2 hours, 1 day, Ongoing)",
-        required=True,
-        max_length=100,
-        style=discord.TextStyle.short
-    )
-    
-    location = discord.ui.TextInput(
-        label="Location/Platform",
-        placeholder="Where will this happen? (e.g., Discord, In-person, Hybrid)",
-        required=True,
-        max_length=100,
-        style=discord.TextStyle.short
-    )
-    
-    contact_info = discord.ui.TextInput(
-        label="Contact Information",
-        placeholder="How should volunteers reach you? (Discord, email, etc.)",
-        required=False,
-        max_length=100,
-        style=discord.TextStyle.short
-    )
+        
+        # Create all the input fields
+        self.task_title = discord.ui.TextInput(
+            label="📝 Task Title",
+            placeholder="Enter a clear, descriptive title for the task",
+            required=True,
+            max_length=100,
+            style=discord.TextStyle.short
+        )
+        
+        self.task_description = discord.ui.TextInput(
+            label="📋 Task Description",
+            placeholder="Describe what needs to be done, requirements, and expectations...",
+            required=True,
+            max_length=1000,
+            style=discord.TextStyle.paragraph
+        )
+        
+        self.required_skills = discord.ui.TextInput(
+            label="🔧 Required Skills (Optional)",
+            placeholder="What skills are needed? (e.g., Photography, Social Media, Technical Support)",
+            required=False,
+            max_length=300,
+            style=discord.TextStyle.short
+        )
+        
+        self.time_commitment = discord.ui.TextInput(
+            label="⏰ Time Commitment",
+            placeholder="How long will this take? (e.g., 2 hours, 1 day, Ongoing)",
+            required=True,
+            max_length=100,
+            style=discord.TextStyle.short
+        )
+        
+        self.location = discord.ui.TextInput(
+            label="📍 Location/Platform",
+            placeholder="Where will this happen? (e.g., Discord, In-person, Hybrid)",
+            required=True,
+            max_length=100,
+            style=discord.TextStyle.short
+        )
+        
+        self.contact_info = discord.ui.TextInput(
+            label="📞 Contact Information",
+            placeholder="How should volunteers reach you? (Discord, email, etc.)",
+            required=False,
+            max_length=100,
+            style=discord.TextStyle.short
+        )
+        
+        # Add all fields to the modal
+        self.add_item(self.task_title)
+        self.add_item(self.task_description)
+        self.add_item(self.required_skills)
+        self.add_item(self.time_commitment)
+        self.add_item(self.location)
+        self.add_item(self.contact_info)
 
     async def on_submit(self, interaction: discord.Interaction):
         """Handle volunteer task creation submission."""
@@ -483,7 +492,7 @@ class VolunteerCog(commands.Cog):
     @cooldown(30)  # 30 second cooldown to prevent spam
     async def add_task(self, interaction: discord.Interaction):
         """Open volunteer task creation modal."""
-            # Show modal for detailed creation
+        # Show modal for detailed creation
         modal = VolunteerTaskCreationModal()
         await interaction.response.send_modal(modal)
 

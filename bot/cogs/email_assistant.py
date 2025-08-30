@@ -52,227 +52,227 @@ class DynamicEmailModal(discord.ui.Modal):
     
     def _create_field_for_placeholder(self, placeholder: str) -> discord.ui.TextInput:
         """Create the most appropriate input field for a given placeholder."""
-        # Common field configurations
+        # Common field configurations with improved UI
         field_configs = {
             'name': {
-                'label': 'Recipient Name',
-                'placeholder': 'Enter recipient\'s full name',
+                'label': '👤 Recipient Name',
+                'placeholder': 'Enter the recipient\'s full name',
                 'required': True,
                 'max_length': 100,
                 'style': discord.TextStyle.short
             },
             'recipient_name': {
-                'label': 'Recipient Name',
-                'placeholder': 'Enter recipient\'s full name',
+                'label': '👤 Recipient Name',
+                'placeholder': 'Enter the recipient\'s full name',
                 'required': True,
                 'max_length': 100,
                 'style': discord.TextStyle.short
             },
             'email': {
-                'label': 'Email Address',
+                'label': '📧 Email Address',
                 'placeholder': 'recipient@example.com',
                 'required': True,
                 'max_length': 254,
                 'style': discord.TextStyle.short
             },
             'recipient_email': {
-                'label': 'Recipient Email',
+                'label': '📧 Recipient Email',
                 'placeholder': 'recipient@example.com',
                 'required': True,
                 'max_length': 254,
                 'style': discord.TextStyle.short
             },
             'contact_email': {
-                'label': 'Contact Email',
+                'label': '📧 Contact Email',
                 'placeholder': 'your@email.com',
                 'required': True,
                 'max_length': 254,
                 'style': discord.TextStyle.short
             },
             'sender_email': {
-                'label': 'Your Email',
+                'label': '📧 Your Email',
                 'placeholder': 'your@email.com',
                 'required': True,
                 'max_length': 254,
                 'style': discord.TextStyle.short
             },
             'sender_name': {
-                'label': 'Your Name',
-                'placeholder': 'Enter your name',
+                'label': '👤 Your Name',
+                'placeholder': 'Enter your full name',
                 'required': True,
                 'max_length': 100,
                 'style': discord.TextStyle.short
             },
             'event_name': {
-                'label': 'Event Name',
+                'label': '🎯 Event Name',
                 'placeholder': 'e.g., Maximally Hackathon 2024',
                 'required': True,
                 'max_length': 200,
                 'style': discord.TextStyle.short
             },
             'hackathon_name': {
-                'label': 'Hackathon Name',
+                'label': '🎯 Hackathon Name',
                 'placeholder': 'e.g., Maximally Hackathon 2024',
                 'required': True,
                 'max_length': 200,
                 'style': discord.TextStyle.short
             },
             'date': {
-                'label': 'Event Date',
+                'label': '📅 Event Date',
                 'placeholder': 'e.g., December 15-17, 2024',
                 'required': True,
                 'max_length': 100,
                 'style': discord.TextStyle.short
             },
             'time': {
-                'label': 'Event Time',
+                'label': '⏰ Event Time',
                 'placeholder': 'e.g., 9:00 AM - 6:00 PM',
                 'required': True,
                 'max_length': 100,
                 'style': discord.TextStyle.short
             },
             'location': {
-                'label': 'Event Location',
+                'label': '📍 Event Location',
                 'placeholder': 'e.g., Online, San Francisco, Hybrid',
                 'required': True,
                 'max_length': 200,
                 'style': discord.TextStyle.short
             },
             'duration': {
-                'label': 'Event Duration',
+                'label': '⏱️ Event Duration',
                 'placeholder': 'e.g., 48 hours, 3 days, 1 week',
                 'required': True,
                 'max_length': 100,
                 'style': discord.TextStyle.short
             },
             'prize_pool': {
-                'label': 'Prize Pool',
+                'label': '💰 Prize Pool',
                 'placeholder': 'e.g., $50,000, $25,000',
                 'required': False,
                 'max_length': 100,
                 'style': discord.TextStyle.short
             },
             'organization': {
-                'label': 'Organization Name',
+                'label': '🏢 Organization Name',
                 'placeholder': 'e.g., Maximally Inc.',
                 'required': True,
                 'max_length': 200,
                 'style': discord.TextStyle.short
             },
             'participants': {
-                'label': 'Number of Participants',
+                'label': '👥 Number of Participants',
                 'placeholder': 'e.g., 500, 1000+',
                 'required': False,
                 'max_length': 50,
                 'style': discord.TextStyle.short
             },
             'theme': {
-                'label': 'Event Theme',
+                'label': '🎨 Event Theme',
                 'placeholder': 'e.g., AI & Sustainability, Web3 Innovation',
                 'required': False,
                 'max_length': 200,
                 'style': discord.TextStyle.short
             },
             'judges': {
-                'label': 'Number of Judges',
+                'label': '⚖️ Number of Judges',
                 'placeholder': 'e.g., 15, 20+',
                 'required': False,
                 'max_length': 50,
                 'style': discord.TextStyle.short
             },
             'min_sponsorship': {
-                'label': 'Minimum Sponsorship Amount',
+                'label': '💵 Minimum Sponsorship',
                 'placeholder': 'e.g., $5,000, $10,000',
                 'required': False,
                 'max_length': 100,
                 'style': discord.TextStyle.short
             },
             'title_amount': {
-                'label': 'Title Sponsor Amount',
+                'label': '👑 Title Sponsor Amount',
                 'placeholder': 'e.g., $25,000, $50,000',
                 'required': False,
                 'max_length': 100,
                 'style': discord.TextStyle.short
             },
             'platinum_amount': {
-                'label': 'Platinum Sponsor Amount',
+                'label': '🥈 Platinum Sponsor Amount',
                 'placeholder': 'e.g., $15,000, $30,000',
                 'required': False,
                 'max_length': 100,
                 'style': discord.TextStyle.short
             },
             'gold_amount': {
-                'label': 'Gold Sponsor Amount',
+                'label': '🥉 Gold Sponsor Amount',
                 'placeholder': 'e.g., $10,000, $20,000',
                 'required': False,
                 'max_length': 100,
                 'style': discord.TextStyle.short
             },
             'custom_amount': {
-                'label': 'Custom Package Amount',
+                'label': '🎯 Custom Package Amount',
                 'placeholder': 'e.g., $8,000, $12,000',
                 'required': False,
                 'max_length': 100,
                 'style': discord.TextStyle.short
             },
             'original_amount': {
-                'label': 'Original Package Amount',
+                'label': '💲 Original Package Amount',
                 'placeholder': 'e.g., $10,000, $15,000',
                 'required': False,
                 'max_length': 100,
                 'style': discord.TextStyle.short
             },
             'deadline': {
-                'label': 'Deadline',
+                'label': '⏳ Deadline',
                 'placeholder': 'e.g., December 1st, 2024',
                 'required': False,
                 'max_length': 100,
                 'style': discord.TextStyle.short
             },
             'final_deadline': {
-                'label': 'Final Deadline',
+                'label': '🚨 Final Deadline',
                 'placeholder': 'e.g., December 10th, 2024',
                 'required': False,
                 'max_length': 100,
                 'style': discord.TextStyle.short
             },
             'payment_deadline': {
-                'label': 'Payment Deadline',
+                'label': '💳 Payment Deadline',
                 'placeholder': 'e.g., December 5th, 2024',
                 'required': False,
                 'max_length': 100,
                 'style': discord.TextStyle.short
             },
             'weeks_until': {
-                'label': 'Weeks Until Event',
+                'label': '📅 Weeks Until Event',
                 'placeholder': 'e.g., 4, 6, 8',
                 'required': False,
                 'max_length': 50,
                 'style': discord.TextStyle.short
             },
             'days_left': {
-                'label': 'Days Left',
+                'label': '⏰ Days Left',
                 'placeholder': 'e.g., 15, 30, 45',
                 'required': False,
                 'max_length': 50,
                 'style': discord.TextStyle.short
             },
             'amount': {
-                'label': 'Amount',
+                'label': '💰 Amount',
                 'placeholder': 'e.g., $5,000, $10,000',
                 'required': False,
                 'max_length': 100,
                 'style': discord.TextStyle.short
             },
             'package_type': {
-                'label': 'Package Type',
+                'label': '📦 Package Type',
                 'placeholder': 'e.g., Gold, Platinum, Title',
                 'required': False,
                 'max_length': 100,
                 'style': discord.TextStyle.short
             },
             'phone': {
-                'label': 'Phone Number',
+                'label': '📞 Phone Number',
                 'placeholder': 'e.g., +1 (555) 123-4567',
                 'required': False,
                 'max_length': 50,
@@ -282,7 +282,7 @@ class DynamicEmailModal(discord.ui.Modal):
         
         # Get configuration for this placeholder
         config = field_configs.get(placeholder, {
-            'label': placeholder.replace('_', ' ').title(),
+            'label': f'📝 {placeholder.replace("_", " ").title()}',
             'placeholder': f'Enter {placeholder.replace("_", " ")}',
             'required': True,
             'max_length': 200,

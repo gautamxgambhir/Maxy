@@ -15,54 +15,63 @@ class ProfileRegistrationModal(discord.ui.Modal, title="👤 Create Your Profile
     
     def __init__(self):
         super().__init__()
-    
-    name = discord.ui.TextInput(
-        label="Full Name",
-        placeholder="Enter your full name (e.g., John Doe)",
-        required=True,
-        max_length=100,
-        style=discord.TextStyle.short
-    )
-    
-    skills = discord.ui.TextInput(
-        label="Skills & Expertise",
-        placeholder="Enter your skills separated by commas (e.g., Python, React, UI/UX, Project Management)",
-        required=False,
-        max_length=500,
-        style=discord.TextStyle.paragraph
-    )
-    
-    interests = discord.ui.TextInput(
-        label="Interests & Goals",
-        placeholder="What are you passionate about? (e.g., AI, Sustainability, Gaming, Social Impact)",
-        required=False,
-        max_length=500,
-        style=discord.TextStyle.paragraph
-    )
-    
-    github = discord.ui.TextInput(
-        label="GitHub Profile (Optional)",
-        placeholder="Your GitHub username or profile URL",
-        required=False,
-        max_length=100,
-        style=discord.TextStyle.short
-    )
-    
-    portfolio = discord.ui.TextInput(
-        label="Portfolio/Website (Optional)",
-        placeholder="Your portfolio website or LinkedIn profile",
-        required=False,
-        max_length=200,
-        style=discord.TextStyle.short
-    )
-    
-    bio = discord.ui.TextInput(
-        label="Bio (Optional)",
-        placeholder="Tell us about yourself in a few sentences...",
-        required=False,
-        max_length=300,
-        style=discord.TextStyle.paragraph
-    )
+        
+        # Create all the input fields
+        self.name = discord.ui.TextInput(
+            label="👤 Full Name",
+            placeholder="Enter your full name (e.g., John Doe)",
+            required=True,
+            max_length=100,
+            style=discord.TextStyle.short
+        )
+        
+        self.skills = discord.ui.TextInput(
+            label="🔧 Skills & Expertise",
+            placeholder="Enter your skills separated by commas (e.g., Python, React, UI/UX, Project Management)",
+            required=False,
+            max_length=500,
+            style=discord.TextStyle.paragraph
+        )
+        
+        self.interests = discord.ui.TextInput(
+            label="❤️ Interests & Goals",
+            placeholder="What are you passionate about? (e.g., AI, Sustainability, Gaming, Social Impact)",
+            required=False,
+            max_length=500,
+            style=discord.TextStyle.paragraph
+        )
+        
+        self.github = discord.ui.TextInput(
+            label="🐙 GitHub Profile (Optional)",
+            placeholder="Your GitHub username or profile URL",
+            required=False,
+            max_length=100,
+            style=discord.TextStyle.short
+        )
+        
+        self.portfolio = discord.ui.TextInput(
+            label="🌐 Portfolio/Website (Optional)",
+            placeholder="Your portfolio website or LinkedIn profile",
+            required=False,
+            max_length=200,
+            style=discord.TextStyle.short
+        )
+        
+        self.bio = discord.ui.TextInput(
+            label="📝 Bio (Optional)",
+            placeholder="Tell us about yourself in a few sentences...",
+            required=False,
+            max_length=300,
+            style=discord.TextStyle.paragraph
+        )
+        
+        # Add all fields to the modal
+        self.add_item(self.name)
+        self.add_item(self.skills)
+        self.add_item(self.interests)
+        self.add_item(self.github)
+        self.add_item(self.portfolio)
+        self.add_item(self.bio)
 
     async def on_submit(self, interaction: discord.Interaction):
         """Handle profile registration submission."""

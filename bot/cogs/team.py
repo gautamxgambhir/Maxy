@@ -19,46 +19,54 @@ class TeamCreationModal(discord.ui.Modal, title="🏆 Create Your Team"):
     
     def __init__(self):
         super().__init__()
-    
-    team_name = discord.ui.TextInput(
-        label="Team Name",
-        placeholder="Enter your team name (e.g., CodeCrafters, Innovation Squad)",
-        required=True,
-        max_length=100,
-        style=discord.TextStyle.short
-    )
-    
-    team_description = discord.ui.TextInput(
-        label="Team Description",
-        placeholder="Describe your team's focus, goals, or what you're looking for...",
-        required=False,
-        max_length=500,
-        style=discord.TextStyle.paragraph
-    )
-    
-    project_idea = discord.ui.TextInput(
-        label="Project Idea (Optional)",
-        placeholder="Brief description of your project idea or area of interest...",
-        required=False,
-        max_length=300,
-        style=discord.TextStyle.paragraph
-    )
-    
-    looking_for = discord.ui.TextInput(
-        label="Looking For (Optional)",
-        placeholder="What skills or team members are you looking for? (e.g., Designer, Backend Developer)",
-        required=False,
-        max_length=200,
-        style=discord.TextStyle.short
-    )
-    
-    contact_info = discord.ui.TextInput(
-        label="Contact Info (Optional)",
-        placeholder="How should others contact you? (Discord, email, etc.)",
-        required=False,
-        max_length=100,
-        style=discord.TextStyle.short
-    )
+        
+        # Create all the input fields
+        self.team_name = discord.ui.TextInput(
+            label="🏆 Team Name",
+            placeholder="Enter your team name (e.g., CodeCrafters, Innovation Squad)",
+            required=True,
+            max_length=100,
+            style=discord.TextStyle.short
+        )
+        
+        self.team_description = discord.ui.TextInput(
+            label="📝 Team Description",
+            placeholder="Describe your team's focus, goals, or what you're looking for...",
+            required=False,
+            max_length=500,
+            style=discord.TextStyle.paragraph
+        )
+        
+        self.project_idea = discord.ui.TextInput(
+            label="💡 Project Idea (Optional)",
+            placeholder="Brief description of your project idea or area of interest...",
+            required=False,
+            max_length=300,
+            style=discord.TextStyle.paragraph
+        )
+        
+        self.looking_for = discord.ui.TextInput(
+            label="🔍 Looking For (Optional)",
+            placeholder="What skills or team members are you looking for? (e.g., Designer, Backend Developer)",
+            required=False,
+            max_length=200,
+            style=discord.TextStyle.short
+        )
+        
+        self.contact_info = discord.ui.TextInput(
+            label="📞 Contact Info (Optional)",
+            placeholder="How should others contact you? (Discord, email, etc.)",
+            required=False,
+            max_length=100,
+            style=discord.TextStyle.short
+        )
+        
+        # Add all fields to the modal
+        self.add_item(self.team_name)
+        self.add_item(self.team_description)
+        self.add_item(self.project_idea)
+        self.add_item(self.looking_for)
+        self.add_item(self.contact_info)
 
     async def on_submit(self, interaction: discord.Interaction):
         """Handle team creation submission."""
@@ -316,19 +324,23 @@ class TeamManagementView(discord.ui.View):
                 )
                 await interaction.edit_original_response(embed=embed, view=None)
 
-class TransferOwnershipModal(discord.ui.Modal, title="Transfer Team Ownership"):
+class TransferOwnershipModal(discord.ui.Modal, title="🔄 Transfer Team Ownership"):
     """Modal for transferring team ownership."""
     
     def __init__(self, team_id: int):
         super().__init__()
         self.team_id = team_id
-    
-    new_owner = discord.ui.TextInput(
-        label="New Owner Username",
-        placeholder="Enter the Discord username of the new owner...",
-        required=True,
-        max_length=100
-    )
+        
+        # Create the input field
+        self.new_owner = discord.ui.TextInput(
+            label="👤 New Owner Username",
+            placeholder="Enter the Discord username of the new owner...",
+            required=True,
+            max_length=100
+        )
+        
+        # Add the field to the modal
+        self.add_item(self.new_owner)
     
     async def on_submit(self, interaction: discord.Interaction):
         try:
