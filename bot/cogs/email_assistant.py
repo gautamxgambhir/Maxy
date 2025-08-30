@@ -306,20 +306,13 @@ class EmailAssistantCog(commands.Cog):
                 )
 
         except Exception as e:
+            # Do not send a generic error banner here; sub-handlers handle user feedback.
+            # This also prevents double messages and 40060 spam on acknowledgement errors.
             if self._is_ack_error(e):
                 self.logger.warning(f"Ignored ack error in email command: {e}")
                 return
             self.logger.exception(f"Email command error: {e}")
-            try:
-                # Avoid sending an additional error banner if the interaction is already acknowledged
-                if not interaction.response.is_done():
-                    await self._safe_send(
-                        interaction,
-                        "❌ An error occurred. Please try again later.",
-                        ephemeral=True
-                    )
-            except Exception:
-                pass
+            return
 
     async def _handle_browse_templates(self, interaction: discord.Interaction,
                                      category: Optional[str] = None):
