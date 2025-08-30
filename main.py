@@ -7,9 +7,10 @@ from bot.core.logger import setup_logging
 from bot.core.bot import MaximallyBot
 from config import config as Config
 
-# Globals to coordinate graceful shutdown without raising in running tasks
+# Globals to coordinate graceful shutdown
 BOT_INSTANCE = None
 RUNNING_LOOP = None
+
 
 def validate_config():
     """Validate required configuration before starting."""
@@ -32,27 +33,24 @@ def validate_config():
 
     print("[INFO] Configuration validated successfully")
 
+
 def signal_handler(signum, frame):
-    """Handle shutdown signals gracefully without raising SystemExit in async tasks."""
+    """Handle shutdown signals gracefully."""
     print(f"\n[SHUTDOWN] Received signal {signum}, shutting down gracefully...")
     try:
-        # Prefer graceful shutdown of the running bot and stop the event loop
-        if RUNNING_LOOP is not None:
-            if BOT_INSTANCE is not None:
-                # Close bot gracefully from signal handler thread
-                asyncio.run_coroutine_threadsafe(BOT_INSTANCE.close(), RUNNING_LOOP)
-            RUNNING_LOOP.call_soon_threadsafe(RUNNING_LOOP.stop)
+        if RUNNING_LOOP and BOT_INSTANCE:
+            asyncio.run_coroutine_threadsafe(BOT_INSTANCE.close(), RUNNING_LOOP)
         else:
-            # Fallback for environments without an active loop
             sys.exit(0)
     except Exception:
-        # Final fallback to ensure process exits if loop coordination fails
         sys.exit(0)
+
 
 async def main():
     """Main async function for bot startup."""
     global BOT_INSTANCE, RUNNING_LOOP
-    # Setup basic logging first for error handling
+
+    # Setup basic logging first
     log_file = os.getenv("LOG_FILE", "logs/bot.log")
     setup_logging(level=Config.LOG_LEVEL, log_file=log_file)
     logger = logging.getLogger(__name__)
@@ -63,18 +61,19 @@ async def main():
 
         logger.info("Starting Maximally Discord Bot...")
 
-        # Create and start bot
+        # Create bot
         bot = MaximallyBot()
-        # Capture references for signal handler
         BOT_INSTANCE = bot
         RUNNING_LOOP = asyncio.get_running_loop()
 
-        # Setup signal handlers for graceful shutdown
+        # Setup signal handlers
         signal.signal(signal.SIGINT, signal_handler)
         signal.signal(signal.SIGTERM, signal_handler)
 
         logger.info("[BOT] Bot starting up...")
-        await bot.start(Config.DISCORD_TOKEN)
+
+        async with bot:
+            await bot.start(Config.DISCORD_TOKEN)
 
     except KeyboardInterrupt:
         logger.info("Bot shutdown requested by user")
@@ -83,5 +82,4 @@ async def main():
         sys.exit(1)
 
 if __name__ == "__main__":
-    # Run the async main function
     asyncio.run(main())
