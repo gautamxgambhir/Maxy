@@ -39,7 +39,14 @@ class Database:
         if row is None:
             return None
         if self.mode == "postgres":
-            return dict(row)
+            # PostgreSQL cursor returns namedtuple-like objects
+            if hasattr(row, '_fields'):
+                return {key: getattr(row, key) for key in row._fields}
+            elif hasattr(row, 'keys'):
+                return {key: row[key] for key in row.keys()}
+            else:
+                # Fallback for other PostgreSQL cursor types
+                return dict(row)
         else:
             # SQLite Row object
             return {key: row[key] for key in row.keys()}
@@ -170,7 +177,9 @@ class Database:
 
     def upsert_profile(self, discord_id, discord_username, name, skills, interests):
         with self.get_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(
+                cursor_factory=psycopg2.extras.RealDictCursor
+            ) if self.mode == "postgres" else conn.cursor()
             if self.mode == "postgres":
                 cursor.execute('''
                     INSERT INTO profiles (discord_id, discord_username, name, skills, interests)
@@ -196,7 +205,9 @@ class Database:
 
     def get_profile(self, discord_id):
         with self.get_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(
+                cursor_factory=psycopg2.extras.RealDictCursor
+            ) if self.mode == "postgres" else conn.cursor()
             query = "SELECT * FROM profiles WHERE discord_id = %s" if self.mode == "postgres" else "SELECT * FROM profiles WHERE discord_id = ?"
             cursor.execute(query, (discord_id,))
             row = cursor.fetchone()
@@ -204,7 +215,9 @@ class Database:
 
     def search_profiles(self, skills=None, interests=None, limit=10):
         with self.get_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(
+                cursor_factory=psycopg2.extras.RealDictCursor
+            ) if self.mode == "postgres" else conn.cursor()
             conditions, params = [], []
 
             if skills:
@@ -233,7 +246,9 @@ class Database:
 
     def create_team(self, name, owner_id, owner_username):
         with self.get_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(
+                cursor_factory=psycopg2.extras.RealDictCursor
+            ) if self.mode == "postgres" else conn.cursor()
             code = secrets.token_hex(4).upper()
             try:
                 if self.mode == "postgres":
@@ -263,7 +278,9 @@ class Database:
 
     def add_team_member(self, team_id, discord_id, discord_username):
         with self.get_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(
+                cursor_factory=psycopg2.extras.RealDictCursor
+            ) if self.mode == "postgres" else conn.cursor()
             query = "INSERT INTO team_members (team_id, discord_id, discord_username) VALUES (%s, %s, %s)" if self.mode == "postgres" else "INSERT INTO team_members (team_id, discord_id, discord_username) VALUES (?, ?, ?)"
             cursor.execute(query, (team_id, discord_id, discord_username))
             if self.mode == "sqlite":
@@ -271,7 +288,9 @@ class Database:
 
     def remove_team_member(self, discord_id):
         with self.get_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(
+                cursor_factory=psycopg2.extras.RealDictCursor
+            ) if self.mode == "postgres" else conn.cursor()
             query = "DELETE FROM team_members WHERE discord_id = %s" if self.mode == "postgres" else "DELETE FROM team_members WHERE discord_id = ?"
             cursor.execute(query, (discord_id,))
             if self.mode == "sqlite":
@@ -280,7 +299,9 @@ class Database:
 
     def get_team_by_code(self, code):
         with self.get_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(
+                cursor_factory=psycopg2.extras.RealDictCursor
+            ) if self.mode == "postgres" else conn.cursor()
             query = "SELECT * FROM teams WHERE code = %s" if self.mode == "postgres" else "SELECT * FROM teams WHERE code = ?"
             cursor.execute(query, (code,))
             row = cursor.fetchone()
@@ -288,7 +309,9 @@ class Database:
 
     def get_team_by_member(self, discord_id):
         with self.get_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(
+                cursor_factory=psycopg2.extras.RealDictCursor
+            ) if self.mode == "postgres" else conn.cursor()
             query = '''
                 SELECT t.*, tm.joined_at
                 FROM teams t
@@ -306,7 +329,9 @@ class Database:
 
     def get_team_members(self, team_id):
         with self.get_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(
+                cursor_factory=psycopg2.extras.RealDictCursor
+            ) if self.mode == "postgres" else conn.cursor()
             query = "SELECT * FROM team_members WHERE team_id = %s ORDER BY joined_at" if self.mode == "postgres" else "SELECT * FROM team_members WHERE team_id = ? ORDER BY joined_at"
             cursor.execute(query, (team_id,))
             rows = cursor.fetchall()
@@ -314,7 +339,9 @@ class Database:
 
     def delete_team_if_empty(self, team_id):
         with self.get_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(
+                cursor_factory=psycopg2.extras.RealDictCursor
+            ) if self.mode == "postgres" else conn.cursor()
             query = "SELECT COUNT(*) FROM team_members WHERE team_id = %s" if self.mode == "postgres" else "SELECT COUNT(*) FROM team_members WHERE team_id = ?"
             cursor.execute(query, (team_id,))
             count = cursor.fetchone()[0] if self.mode == "sqlite" else cursor.fetchone()["count"]
@@ -329,7 +356,9 @@ class Database:
 
     def delete_team(self, team_id):
         with self.get_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(
+                cursor_factory=psycopg2.extras.RealDictCursor
+            ) if self.mode == "postgres" else conn.cursor()
             q1 = "DELETE FROM team_members WHERE team_id = %s" if self.mode == "postgres" else "DELETE FROM team_members WHERE team_id = ?"
             q2 = "DELETE FROM teams WHERE id = %s" if self.mode == "postgres" else "DELETE FROM teams WHERE id = ?"
             cursor.execute(q1, (team_id,))
@@ -339,7 +368,9 @@ class Database:
 
     def transfer_team_ownership(self, team_id, new_owner_id):
         with self.get_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(
+                cursor_factory=psycopg2.extras.RealDictCursor
+            ) if self.mode == "postgres" else conn.cursor()
             query = "UPDATE teams SET owner_id = %s WHERE id = %s" if self.mode == "postgres" else "UPDATE teams SET owner_id = ? WHERE id = ?"
             cursor.execute(query, (new_owner_id, team_id))
             if self.mode == "sqlite":
@@ -349,7 +380,9 @@ class Database:
 
     def create_volunteer_task(self, title, creator_id, creator_username):
         with self.get_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(
+                cursor_factory=psycopg2.extras.RealDictCursor
+            ) if self.mode == "postgres" else conn.cursor()
             if self.mode == "postgres":
                 cursor.execute(
                     "INSERT INTO volunteer_tasks (title, creator_id, creator_username) VALUES (%s, %s, %s) RETURNING id",
@@ -367,7 +400,9 @@ class Database:
 
     def get_volunteer_task_by_id(self, task_id):
         with self.get_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(
+                cursor_factory=psycopg2.extras.RealDictCursor
+            ) if self.mode == "postgres" else conn.cursor()
             query = "SELECT * FROM volunteer_tasks WHERE id = %s" if self.mode == "postgres" else "SELECT * FROM volunteer_tasks WHERE id = ?"
             cursor.execute(query, (task_id,))
             row = cursor.fetchone()
@@ -375,14 +410,18 @@ class Database:
 
     def get_all_volunteer_tasks(self):
         with self.get_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(
+                cursor_factory=psycopg2.extras.RealDictCursor
+            ) if self.mode == "postgres" else conn.cursor()
             cursor.execute("SELECT * FROM volunteer_tasks ORDER BY created_at DESC")
             rows = cursor.fetchall()
             return [self._row_to_dict(row) for row in rows]
 
     def join_volunteer_task(self, task_id, discord_id, discord_username):
         with self.get_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(
+                cursor_factory=psycopg2.extras.RealDictCursor
+            ) if self.mode == "postgres" else conn.cursor()
             try:
                 # Check if task exists and is open
                 task = self.get_volunteer_task_by_id(task_id)
@@ -399,7 +438,9 @@ class Database:
 
     def leave_volunteer_task(self, task_id, discord_id):
         with self.get_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(
+                cursor_factory=psycopg2.extras.RealDictCursor
+            ) if self.mode == "postgres" else conn.cursor()
             query = "DELETE FROM volunteer_participants WHERE task_id = %s AND discord_id = %s" if self.mode == "postgres" else "DELETE FROM volunteer_participants WHERE task_id = ? AND discord_id = ?"
             cursor.execute(query, (task_id, discord_id))
             if self.mode == "sqlite":
@@ -408,7 +449,9 @@ class Database:
 
     def get_user_volunteer_status(self, discord_id):
         with self.get_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(
+                cursor_factory=psycopg2.extras.RealDictCursor
+            ) if self.mode == "postgres" else conn.cursor()
 
             # Get tasks created by user
             created_query = "SELECT * FROM volunteer_tasks WHERE creator_id = %s ORDER BY created_at DESC" if self.mode == "postgres" else "SELECT * FROM volunteer_tasks WHERE creator_id = ? ORDER BY created_at DESC"
@@ -434,7 +477,9 @@ class Database:
 
     def remove_volunteer_task(self, task_id):
         with self.get_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(
+                cursor_factory=psycopg2.extras.RealDictCursor
+            ) if self.mode == "postgres" else conn.cursor()
             # Remove participants first
             q1 = "DELETE FROM volunteer_participants WHERE task_id = %s" if self.mode == "postgres" else "DELETE FROM volunteer_participants WHERE task_id = ?"
             cursor.execute(q1, (task_id,))

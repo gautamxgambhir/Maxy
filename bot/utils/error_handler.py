@@ -119,7 +119,7 @@ async def handle_error(
             embed=embed,
             ephemeral=error.ephemeral
         )
-    elif isinstance(error, discord.errors.MissingPermissions):
+    elif isinstance(error, discord.app_commands.errors.MissingPermissions):
         embed = error_embed(
             "Missing Permissions",
             f"You don't have permission to use this command.",
