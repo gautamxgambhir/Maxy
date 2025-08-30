@@ -188,25 +188,54 @@ class EmailAssistantCog(commands.Cog):
 
         self.user_context = {}
         self.template_cache = {}
+        self._responded_interactions = set()
 
     def _is_ack_error(self, e: Exception) -> bool:
+        """Return True when the exception represents an already-acknowledged interaction."""
         try:
-            return isinstance(e, discord.errors.HTTPException) and getattr(e, "code", None) == 40060
+            # Either the library threw InteractionResponded or HTTPException with Discord code 40060
+            if isinstance(e, discord.errors.InteractionResponded):
+                return True
+            if isinstance(e, discord.errors.HTTPException):
+                code = getattr(e, "code", None)
+                if code == 40060:
+                    return True
+            # Fallback to string checks in case attributes are not present in the environment
+            s = str(e).lower()
+            if "already been acknowledged" in s or "40060" in s:
+                return True
+            return False
         except Exception:
             return False
 
     async def _safe_send(self, interaction: discord.Interaction, *args, **kwargs):
-        """Send a response safely whether or not the interaction is already acknowledged."""
+        """Send a response safely whether or not the interaction is already acknowledged,
+        and prevent duplicate sends for the same interaction."""
         try:
+            # Deduplicate per interaction to avoid double responses
+            ixn_id = getattr(interaction, "id", None)
+            if ixn_id is not None and ixn_id in self._responded_interactions:
+                return None
+
             if interaction.response.is_done():
-                return await interaction.followup.send(*args, **kwargs)
+                result = await interaction.followup.send(*args, **kwargs)
             else:
-                return await interaction.response.send_message(*args, **kwargs)
-        except (discord.errors.InteractionResponded, discord.errors.HTTPException):
+                result = await interaction.response.send_message(*args, **kwargs)
+
+            if ixn_id is not None:
+                self._responded_interactions.add(ixn_id)
+            return result
+        except (discord.errors.InteractionResponded, discord.errors.HTTPException) as e:
+            # Fallback to followup in case initial path failed
             try:
-                return await interaction.followup.send(*args, **kwargs)
+                result = await interaction.followup.send(*args, **kwargs)
+                ixn_id = getattr(interaction, "id", None)
+                if ixn_id is not None:
+                    self._responded_interactions.add(ixn_id)
+                return result
             except Exception as inner_e:
                 self.logger.warning(f"Safe send failed: {inner_e}")
+                return None
 
     async def cog_load(self):
         """Initialize when loaded."""
@@ -255,12 +284,7 @@ class EmailAssistantCog(commands.Cog):
                            action: str, category: Optional[str] = None):
         """Main email command with multiple actions."""
         try:
-            # Defer the response since we might do database operations
-            try:
-                if not interaction.response.is_done():
-                    await interaction.response.defer(ephemeral=True)
-            except (discord.errors.InteractionResponded, discord.errors.HTTPException):
-                pass
+            # Let sub-handlers handle deferral to avoid duplicate acknowledgements
 
             if action == "browse":
                 await self._handle_browse_templates(interaction, category)
@@ -301,6 +325,11 @@ class EmailAssistantCog(commands.Cog):
                                      category: Optional[str] = None):
         """Handle template browsing."""
         try:
+            try:
+                if not interaction.response.is_done():
+                    await interaction.response.defer(ephemeral=True)
+            except (discord.errors.InteractionResponded, discord.errors.HTTPException):
+                pass
             if category:
                 templates = await self.template_manager.get_available_templates(category)
                 if not templates:
@@ -355,10 +384,14 @@ class EmailAssistantCog(commands.Cog):
                     self.logger.warning("Could not send categories response - interaction already handled")
 
         except Exception as e:
+            if self._is_ack_error(e):
+                self.logger.warning(f"Ignored ack error in browse templates: {e}")
+                return
             self.logger.error(f"Browse templates error: {e}")
             try:
-                if not interaction.is_expired():
-                    await self._safe_send(interaction,
+                if not interaction.response.is_done():
+                    await self._safe_send(
+                        interaction,
                         "❌ Failed to browse templates.",
                         ephemeral=True
                     )
@@ -368,6 +401,11 @@ class EmailAssistantCog(commands.Cog):
     async def _handle_send_email_workflow(self, interaction: discord.Interaction):
         """Handle the email sending workflow."""
         try:
+            try:
+                if not interaction.response.is_done():
+                    await interaction.response.defer(ephemeral=True)
+            except (discord.errors.InteractionResponded, discord.errors.HTTPException):
+                pass
             if not self.resend_client:
                 try:
                     await self._safe_send(interaction,
@@ -413,6 +451,11 @@ class EmailAssistantCog(commands.Cog):
     async def _handle_view_stats(self, interaction: discord.Interaction):
         """Handle viewing email statistics."""
         try:
+            try:
+                if not interaction.response.is_done():
+                    await interaction.response.defer(ephemeral=True)
+            except (discord.errors.InteractionResponded, discord.errors.HTTPException):
+                pass
             stats = await self.email_logger.get_stats()
 
             embed = discord.Embed(
@@ -470,6 +513,11 @@ class EmailAssistantCog(commands.Cog):
     async def _handle_view_history(self, interaction: discord.Interaction):
         """Handle viewing email history."""
         try:
+            try:
+                if not interaction.response.is_done():
+                    await interaction.response.defer(ephemeral=True)
+            except (discord.errors.InteractionResponded, discord.errors.HTTPException):
+                pass
             logs = await self.email_logger.get_logs({'limit': 10, 'sent_by': interaction.user.id})
 
             if not logs:
@@ -507,6 +555,11 @@ class EmailAssistantCog(commands.Cog):
     async def _handle_manage_templates(self, interaction: discord.Interaction):
         """Handle template management interface."""
         try:
+            try:
+                if not interaction.response.is_done():
+                    await interaction.response.defer(ephemeral=True)
+            except (discord.errors.InteractionResponded, discord.errors.HTTPException):
+                pass
             embed = discord.Embed(
                 title="🔧 Template Management",
                 description="Available management commands:",
@@ -552,6 +605,11 @@ class EmailAssistantCog(commands.Cog):
     async def _handle_help(self, interaction: discord.Interaction):
         """Handle help command."""
         try:
+            try:
+                if not interaction.response.is_done():
+                    await interaction.response.defer(ephemeral=True)
+            except (discord.errors.InteractionResponded, discord.errors.HTTPException):
+                pass
             embed = discord.Embed(
                 title="❓ Email Assistant Help",
                 description="Complete guide to using the email assistant:",
@@ -619,7 +677,6 @@ class EmailAssistantCog(commands.Cog):
                     await interaction.response.defer(ephemeral=True)
             except (discord.errors.InteractionResponded, discord.errors.HTTPException):
                 pass
-
             if not self.resend_client:
                 try:
                     await self._safe_send(interaction,
@@ -720,7 +777,6 @@ class EmailAssistantCog(commands.Cog):
                     await interaction.response.defer(ephemeral=True)
             except (discord.errors.InteractionResponded, discord.errors.HTTPException):
                 pass
-
             email_template = await self.template_manager.get_template(category, template)
             if not email_template:
                 await self._safe_send(interaction,
@@ -789,7 +845,6 @@ class EmailAssistantCog(commands.Cog):
                     await interaction.response.defer(ephemeral=True)
             except (discord.errors.InteractionResponded, discord.errors.HTTPException):
                 pass
-
             if category:
                 templates = await self.template_manager.get_available_templates(category)
                 if not templates:
@@ -872,7 +927,6 @@ class EmailAssistantCog(commands.Cog):
                     await interaction.response.defer(ephemeral=True)
             except (discord.errors.InteractionResponded, discord.errors.HTTPException):
                 pass
-
             email_template = await self.template_manager.get_template(category, template)
             if not email_template:
                 await self._safe_send(interaction,
@@ -964,7 +1018,6 @@ class EmailAssistantCog(commands.Cog):
                     await interaction.response.defer(ephemeral=True)
             except (discord.errors.InteractionResponded, discord.errors.HTTPException):
                 pass
-
             template = await self.template_manager.add_template(
                 category=category,
                 name=name,
@@ -1042,7 +1095,6 @@ class EmailAssistantCog(commands.Cog):
                     await interaction.response.defer(ephemeral=True)
             except (discord.errors.InteractionResponded, discord.errors.HTTPException):
                 pass
-
             existing_template = await self.template_manager.get_template(category, name)
             if not existing_template:
                 await self._safe_send(interaction,
@@ -1130,7 +1182,6 @@ class EmailAssistantCog(commands.Cog):
                     await interaction.response.defer(ephemeral=True)
             except (discord.errors.InteractionResponded, discord.errors.HTTPException):
                 pass
-
             if confirm != "DELETE":
                 embed = discord.Embed(
                     title="⚠️ Confirmation Required",

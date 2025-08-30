@@ -7,6 +7,10 @@ from bot.core.logger import setup_logging
 from bot.core.bot import MaximallyBot
 from config import config as Config
 
+# Globals to coordinate graceful shutdown without raising in running tasks
+BOT_INSTANCE = None
+RUNNING_LOOP = None
+
 def validate_config():
     """Validate required configuration before starting."""
     required_vars = ['DISCORD_TOKEN']
@@ -29,12 +33,25 @@ def validate_config():
     print("[INFO] Configuration validated successfully")
 
 def signal_handler(signum, frame):
-    """Handle shutdown signals gracefully."""
+    """Handle shutdown signals gracefully without raising SystemExit in async tasks."""
     print(f"\n[SHUTDOWN] Received signal {signum}, shutting down gracefully...")
-    sys.exit(0)
+    try:
+        # Prefer graceful shutdown of the running bot and stop the event loop
+        if RUNNING_LOOP is not None:
+            if BOT_INSTANCE is not None:
+                # Close bot gracefully from signal handler thread
+                asyncio.run_coroutine_threadsafe(BOT_INSTANCE.close(), RUNNING_LOOP)
+            RUNNING_LOOP.call_soon_threadsafe(RUNNING_LOOP.stop)
+        else:
+            # Fallback for environments without an active loop
+            sys.exit(0)
+    except Exception:
+        # Final fallback to ensure process exits if loop coordination fails
+        sys.exit(0)
 
 async def main():
     """Main async function for bot startup."""
+    global BOT_INSTANCE, RUNNING_LOOP
     # Setup basic logging first for error handling
     log_file = os.getenv("LOG_FILE", "logs/bot.log")
     setup_logging(level=Config.LOG_LEVEL, log_file=log_file)
@@ -48,6 +65,9 @@ async def main():
 
         # Create and start bot
         bot = MaximallyBot()
+        # Capture references for signal handler
+        BOT_INSTANCE = bot
+        RUNNING_LOOP = asyncio.get_running_loop()
 
         # Setup signal handlers for graceful shutdown
         signal.signal(signal.SIGINT, signal_handler)
