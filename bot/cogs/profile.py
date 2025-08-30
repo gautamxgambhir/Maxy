@@ -146,42 +146,49 @@ class ProfileEditModal(discord.ui.Modal, title="✏️ Edit Your Profile"):
     def __init__(self, current_profile):
         super().__init__()
         self.current_profile = current_profile
-    
-    name = discord.ui.TextInput(
-        label="Full Name",
-        default=current_profile.get('name', ''),
-        placeholder="Enter your full name",
-        required=True,
-        max_length=100,
-        style=discord.TextStyle.short
-    )
-    
-    skills = discord.ui.TextInput(
-        label="Skills & Expertise",
-        default=current_profile.get('skills', ''),
-        placeholder="Enter your skills separated by commas",
-        required=False,
-        max_length=500,
-        style=discord.TextStyle.paragraph
-    )
-    
-    interests = discord.ui.TextInput(
-        label="Interests & Goals",
-        default=current_profile.get('interests', ''),
-        placeholder="What are you passionate about?",
-        required=False,
-        max_length=500,
-        style=discord.TextStyle.paragraph
-    )
-    
-    bio = discord.ui.TextInput(
-        label="Bio (Optional)",
-        default=current_profile.get('bio', ''),
-        placeholder="Tell us about yourself...",
-        required=False,
-        max_length=300,
-        style=discord.TextStyle.paragraph
-    )
+        
+        # Create TextInput fields with current values
+        self.name = discord.ui.TextInput(
+            label="Full Name",
+            default=current_profile.get('name', ''),
+            placeholder="Enter your full name",
+            required=True,
+            max_length=100,
+            style=discord.TextStyle.short
+        )
+        
+        self.skills = discord.ui.TextInput(
+            label="Skills & Expertise",
+            default=current_profile.get('skills', ''),
+            placeholder="Enter your skills separated by commas",
+            required=False,
+            max_length=500,
+            style=discord.TextStyle.paragraph
+        )
+        
+        self.interests = discord.ui.TextInput(
+            label="Interests & Goals",
+            default=current_profile.get('interests', ''),
+            placeholder="What are you passionate about?",
+            required=False,
+            max_length=500,
+            style=discord.TextStyle.paragraph
+        )
+        
+        self.bio = discord.ui.TextInput(
+            label="Bio (Optional)",
+            default=current_profile.get('bio', ''),
+            placeholder="Tell us about yourself...",
+            required=False,
+            max_length=300,
+            style=discord.TextStyle.paragraph
+        )
+        
+        # Add the fields to the modal
+        self.add_item(self.name)
+        self.add_item(self.skills)
+        self.add_item(self.interests)
+        self.add_item(self.bio)
 
     async def on_submit(self, interaction: discord.Interaction):
         """Handle profile edit submission."""
