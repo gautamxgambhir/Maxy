@@ -483,7 +483,7 @@ class VolunteerCog(commands.Cog):
     @cooldown(30)  # 30 second cooldown to prevent spam
     async def add_task(self, interaction: discord.Interaction):
         """Open volunteer task creation modal."""
-        # Show modal for detailed creation
+            # Show modal for detailed creation
         modal = VolunteerTaskCreationModal()
         await interaction.response.send_modal(modal)
 
