@@ -236,18 +236,12 @@ class EmailAssistantCog(commands.Cog):
                            action: str, category: Optional[str] = None):
         """Main email command with multiple actions."""
         try:
-            # Check if interaction is still valid
-            if interaction.is_expired():
-                self.logger.warning("Interaction has expired, cannot respond")
-                return
-
             # Defer the response since we might do database operations
             try:
-                await interaction.response.defer(ephemeral=True)
-            except discord.errors.InteractionResponded:
-                # Interaction already responded, log and return
-                self.logger.warning("Interaction already responded to")
-                return
+                if not interaction.response.is_done():
+                    await interaction.response.defer(ephemeral=True)
+            except (discord.errors.InteractionResponded, discord.errors.HTTPException):
+                pass
 
             if action == "browse":
                 await self._handle_browse_templates(interaction, category)
@@ -596,17 +590,12 @@ class EmailAssistantCog(commands.Cog):
                                 placeholders: Optional[str] = None):
         """Send email using template."""
         try:
-            # Check if interaction is still valid
-            if interaction.is_expired():
-                self.logger.warning("Interaction has expired, cannot respond")
-                return
-
             # Defer the response since we do database operations and email sending
             try:
-                await interaction.response.defer(ephemeral=True)
-            except discord.errors.InteractionResponded:
-                self.logger.warning("Interaction already responded to")
-                return
+                if not interaction.response.is_done():
+                    await interaction.response.defer(ephemeral=True)
+            except (discord.errors.InteractionResponded, discord.errors.HTTPException):
+                pass
 
             if not self.resend_client:
                 try:
@@ -703,7 +692,11 @@ class EmailAssistantCog(commands.Cog):
         """Copy email draft text."""
         try:
             # Defer the response since we do database operations
-            await interaction.response.defer(ephemeral=True)
+            try:
+                if not interaction.response.is_done():
+                    await interaction.response.defer(ephemeral=True)
+            except (discord.errors.InteractionResponded, discord.errors.HTTPException):
+                pass
 
             email_template = await self.template_manager.get_template(category, template)
             if not email_template:
@@ -767,17 +760,12 @@ class EmailAssistantCog(commands.Cog):
                                 category: Optional[str] = None):
         """List available email templates."""
         try:
-            # Check if interaction is still valid
-            if interaction.is_expired():
-                self.logger.warning("Interaction has expired, cannot respond")
-                return
-
             # Defer the response since we do database operations
             try:
-                await interaction.response.defer(ephemeral=True)
-            except discord.errors.InteractionResponded:
-                self.logger.warning("Interaction already responded to")
-                return
+                if not interaction.response.is_done():
+                    await interaction.response.defer(ephemeral=True)
+            except (discord.errors.InteractionResponded, discord.errors.HTTPException):
+                pass
 
             if category:
                 templates = await self.template_manager.get_available_templates(category)
@@ -852,7 +840,11 @@ class EmailAssistantCog(commands.Cog):
         """Preview email template with filled placeholders."""
         try:
             # Defer the response since we do database operations
-            await interaction.response.defer(ephemeral=True)
+            try:
+                if not interaction.response.is_done():
+                    await interaction.response.defer(ephemeral=True)
+            except (discord.errors.InteractionResponded, discord.errors.HTTPException):
+                pass
 
             email_template = await self.template_manager.get_template(category, template)
             if not email_template:
@@ -940,7 +932,11 @@ class EmailAssistantCog(commands.Cog):
         """Create a new email template."""
         try:
             # Defer the response since we do database operations
-            await interaction.response.defer(ephemeral=True)
+            try:
+                if not interaction.response.is_done():
+                    await interaction.response.defer(ephemeral=True)
+            except (discord.errors.InteractionResponded, discord.errors.HTTPException):
+                pass
 
             template = await self.template_manager.add_template(
                 category=category,
@@ -1014,7 +1010,11 @@ class EmailAssistantCog(commands.Cog):
         """Edit an existing email template."""
         try:
             # Defer the response since we do database operations
-            await interaction.response.defer(ephemeral=True)
+            try:
+                if not interaction.response.is_done():
+                    await interaction.response.defer(ephemeral=True)
+            except (discord.errors.InteractionResponded, discord.errors.HTTPException):
+                pass
 
             existing_template = await self.template_manager.get_template(category, name)
             if not existing_template:
@@ -1098,7 +1098,11 @@ class EmailAssistantCog(commands.Cog):
         """Delete an email template."""
         try:
             # Defer the response since we do database operations
-            await interaction.response.defer(ephemeral=True)
+            try:
+                if not interaction.response.is_done():
+                    await interaction.response.defer(ephemeral=True)
+            except (discord.errors.InteractionResponded, discord.errors.HTTPException):
+                pass
 
             if confirm != "DELETE":
                 embed = discord.Embed(

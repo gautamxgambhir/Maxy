@@ -146,6 +146,30 @@ class Template:
         except (json.JSONDecodeError, TypeError, ValueError):
             placeholders = []
 
+        # Robust datetime parsing: accept ISO strings or datetime objects
+        created_at_raw = data.get('created_at')
+        updated_at_raw = data.get('updated_at')
+
+        def _parse_dt(val):
+            if isinstance(val, datetime):
+                return val
+            if isinstance(val, str):
+                try:
+                    # Try Python ISO format first
+                    return datetime.fromisoformat(val)
+                except Exception:
+                    # Fallback common formats
+                    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d", "%m/%d/%Y %H:%M:%S", "%m/%d/%Y"):
+                        try:
+                            return datetime.strptime(val, fmt)
+                        except Exception:
+                            continue
+            # Final fallback
+            return datetime.now()
+
+        created_at = _parse_dt(created_at_raw)
+        updated_at = _parse_dt(updated_at_raw)
+
         return cls(
             id=data['id'],
             category=data['category'],
@@ -154,8 +178,8 @@ class Template:
             body=data['body'],
             tone=data.get('tone', 'formal'),
             placeholders=placeholders,
-            created_at=datetime.fromisoformat(data['created_at']),
-            updated_at=datetime.fromisoformat(data['updated_at'])
+            created_at=created_at,
+            updated_at=updated_at
         )
     
     @classmethod

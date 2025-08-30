@@ -27,17 +27,12 @@ class ProfileCog(commands.Cog):
         interests: str
     ):
         try:
-            # Check if interaction is still valid
-            if interaction.is_expired():
-                self.logger.warning("Interaction has expired, cannot respond")
-                return
-
             # Defer the response since we do database operations
             try:
-                await interaction.response.defer(ephemeral=True)
-            except discord.errors.InteractionResponded:
-                self.logger.warning("Interaction already responded to")
-                return
+                if not interaction.response.is_done():
+                    await interaction.response.defer(ephemeral=True)
+            except (discord.errors.InteractionResponded, discord.errors.HTTPException):
+                pass
 
             name = validation.validate_name(name)
             skills = validation.validate_skills(skills)
@@ -109,17 +104,12 @@ class ProfileCog(commands.Cog):
         interests: str = None
     ):
         try:
-            # Check if interaction is still valid
-            if interaction.is_expired():
-                self.logger.warning("Interaction has expired, cannot respond")
-                return
-
             # Defer the response since we do database operations
             try:
-                await interaction.response.defer(ephemeral=True)
-            except discord.errors.InteractionResponded:
-                self.logger.warning("Interaction already responded to")
-                return
+                if not interaction.response.is_done():
+                    await interaction.response.defer(ephemeral=True)
+            except (discord.errors.InteractionResponded, discord.errors.HTTPException):
+                pass
 
             discord_id = str(interaction.user.id)
             current_profile = db.get_profile(discord_id)
@@ -199,17 +189,12 @@ class ProfileCog(commands.Cog):
         interaction: discord.Interaction
     ):
         try:
-            # Check if interaction is still valid
-            if interaction.is_expired():
-                self.logger.warning("Interaction has expired, cannot respond")
-                return
-
             # Defer the response since we do database operations
             try:
-                await interaction.response.defer(ephemeral=True)
-            except discord.errors.InteractionResponded:
-                self.logger.warning("Interaction already responded to")
-                return
+                if not interaction.response.is_done():
+                    await interaction.response.defer(ephemeral=True)
+            except (discord.errors.InteractionResponded, discord.errors.HTTPException):
+                pass
 
             discord_id = str(interaction.user.id)
             profile = db.get_profile(discord_id)
