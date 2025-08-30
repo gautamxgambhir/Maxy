@@ -284,7 +284,23 @@ class EmailAssistantCog(commands.Cog):
                            action: str, category: Optional[str] = None):
         """Main email command with multiple actions."""
         try:
-            # Let sub-handlers handle deferral to avoid duplicate acknowledgements
+            # Defer once at the top; sub-handlers will only send followups
+            # already deferred at top-level
+
+            # Normalize and alias actions to avoid mismatched values causing double handling or errors
+            action_norm = (action or "").strip().lower().replace(" ", "").replace("-", "_")
+            if action_norm in ("browse", "browse_templates", "list_templates", "templates"):
+                action = "browse"
+            elif action_norm in ("send", "send_email", "email_send", "quick_send"):
+                action = "send"
+            elif action_norm in ("stats", "statistics", "view_statistics", "analytics"):
+                action = "stats"
+            elif action_norm in ("history", "view_history", "logs"):
+                action = "history"
+            elif action_norm in ("manage", "manage_templates", "templates_manage"):
+                action = "manage"
+            elif action_norm in ("help", "help_me", "usage"):
+                action = "help"
 
             if action == "browse":
                 await self._handle_browse_templates(interaction, category)
@@ -318,11 +334,7 @@ class EmailAssistantCog(commands.Cog):
                                      category: Optional[str] = None):
         """Handle template browsing."""
         try:
-            try:
-                if not interaction.response.is_done():
-                    await interaction.response.defer(ephemeral=True)
-            except (discord.errors.InteractionResponded, discord.errors.HTTPException):
-                pass
+            # already deferred at top-level
             if category:
                 templates = await self.template_manager.get_available_templates(category)
                 if not templates:
@@ -394,11 +406,7 @@ class EmailAssistantCog(commands.Cog):
     async def _handle_send_email_workflow(self, interaction: discord.Interaction):
         """Handle the email sending workflow."""
         try:
-            try:
-                if not interaction.response.is_done():
-                    await interaction.response.defer(ephemeral=True)
-            except (discord.errors.InteractionResponded, discord.errors.HTTPException):
-                pass
+            # already deferred at top-level
             if not self.resend_client:
                 try:
                     await self._safe_send(interaction,
@@ -444,11 +452,7 @@ class EmailAssistantCog(commands.Cog):
     async def _handle_view_stats(self, interaction: discord.Interaction):
         """Handle viewing email statistics."""
         try:
-            try:
-                if not interaction.response.is_done():
-                    await interaction.response.defer(ephemeral=True)
-            except (discord.errors.InteractionResponded, discord.errors.HTTPException):
-                pass
+            # already deferred at top-level
             stats = await self.email_logger.get_stats()
 
             embed = discord.Embed(
@@ -506,11 +510,7 @@ class EmailAssistantCog(commands.Cog):
     async def _handle_view_history(self, interaction: discord.Interaction):
         """Handle viewing email history."""
         try:
-            try:
-                if not interaction.response.is_done():
-                    await interaction.response.defer(ephemeral=True)
-            except (discord.errors.InteractionResponded, discord.errors.HTTPException):
-                pass
+            # already deferred at top-level
             logs = await self.email_logger.get_logs({'limit': 10, 'sent_by': interaction.user.id})
 
             if not logs:
@@ -548,11 +548,7 @@ class EmailAssistantCog(commands.Cog):
     async def _handle_manage_templates(self, interaction: discord.Interaction):
         """Handle template management interface."""
         try:
-            try:
-                if not interaction.response.is_done():
-                    await interaction.response.defer(ephemeral=True)
-            except (discord.errors.InteractionResponded, discord.errors.HTTPException):
-                pass
+            # already deferred at top-level
             embed = discord.Embed(
                 title="🔧 Template Management",
                 description="Available management commands:",
@@ -598,11 +594,7 @@ class EmailAssistantCog(commands.Cog):
     async def _handle_help(self, interaction: discord.Interaction):
         """Handle help command."""
         try:
-            try:
-                if not interaction.response.is_done():
-                    await interaction.response.defer(ephemeral=True)
-            except (discord.errors.InteractionResponded, discord.errors.HTTPException):
-                pass
+            # already deferred at top-level
             embed = discord.Embed(
                 title="❓ Email Assistant Help",
                 description="Complete guide to using the email assistant:",
