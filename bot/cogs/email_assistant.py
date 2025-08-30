@@ -189,6 +189,12 @@ class EmailAssistantCog(commands.Cog):
         self.user_context = {}
         self.template_cache = {}
 
+    def _is_ack_error(self, e: Exception) -> bool:
+        try:
+            return isinstance(e, discord.errors.HTTPException) and getattr(e, "code", None) == 40060
+        except Exception:
+            return False
+
     async def _safe_send(self, interaction: discord.Interaction, *args, **kwargs):
         """Send a response safely whether or not the interaction is already acknowledged."""
         try:
@@ -276,6 +282,9 @@ class EmailAssistantCog(commands.Cog):
                 )
 
         except Exception as e:
+            if self._is_ack_error(e):
+                self.logger.warning(f"Ignored ack error in email command: {e}")
+                return
             self.logger.exception(f"Email command error: {e}")
             try:
                 # Avoid sending an additional error banner if the interaction is already acknowledged
@@ -829,10 +838,14 @@ class EmailAssistantCog(commands.Cog):
                 self.logger.warning("Could not send list templates response - interaction already handled")
 
         except Exception as e:
+            if self._is_ack_error(e):
+                self.logger.warning(f"Ignored ack error in email-list: {e}")
+                return
             self.logger.error(f"Email list error: {e}")
             try:
-                if not interaction.is_expired():
-                    await self._safe_send(interaction,
+                if not interaction.response.is_done():
+                    await self._safe_send(
+                        interaction,
                         "❌ Failed to list templates.",
                         ephemeral=True
                     )

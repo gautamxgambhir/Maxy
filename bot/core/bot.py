@@ -14,7 +14,13 @@ import datetime
 
 class MaximallyBot(commands.Bot):
     def __init__(self):
-        intents = discord.Intents.default()
+        # Configure intents explicitly. Slash commands don't require message_content,
+        # but other features may. Enable it here and remind to toggle in Dev Portal.
+        intents = discord.Intents.all()
+        intents.guilds = True
+        intents.members = True
+        intents.message_content = True  # Requires enabling in Discord Developer Portal
+
         super().__init__(
             command_prefix="!",
             intents=intents,
@@ -26,6 +32,9 @@ class MaximallyBot(commands.Bot):
         self.logger = logging.getLogger(__name__)
         self.config = Config
         self.start_time = datetime.datetime.utcnow()
+        self.logger.info("Intents configured: guilds=%s, members=%s, message_content=%s",
+                         intents.guilds, intents.members, intents.message_content)
+        self.logger.info("If you still see a message_content warning, enable 'MESSAGE CONTENT INTENT' in the Discord Developer Portal for this bot.")
 
     async def setup_hook(self):
         await self.add_cog(ProfileCog(self))
