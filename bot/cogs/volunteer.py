@@ -12,6 +12,153 @@ from bot.utils.error_handler import (
 )
 import logging
 
+class VolunteerTaskCreationModal(discord.ui.Modal, title="🤝 Create Volunteer Task"):
+    """Modal for creating volunteer tasks with comprehensive information."""
+    
+    def __init__(self):
+        super().__init__()
+    
+    task_title = discord.ui.TextInput(
+        label="Task Title",
+        placeholder="Enter a clear, descriptive title for the task",
+        required=True,
+        max_length=100,
+        style=discord.TextStyle.short
+    )
+    
+    task_description = discord.ui.TextInput(
+        label="Task Description",
+        placeholder="Describe what needs to be done, requirements, and expectations...",
+        required=True,
+        max_length=1000,
+        style=discord.TextStyle.paragraph
+    )
+    
+    required_skills = discord.ui.TextInput(
+        label="Required Skills (Optional)",
+        placeholder="What skills are needed? (e.g., Photography, Social Media, Technical Support)",
+        required=False,
+        max_length=300,
+        style=discord.TextStyle.short
+    )
+    
+    time_commitment = discord.ui.TextInput(
+        label="Time Commitment",
+        placeholder="How long will this take? (e.g., 2 hours, 1 day, Ongoing)",
+        required=True,
+        max_length=100,
+        style=discord.TextStyle.short
+    )
+    
+    location = discord.ui.TextInput(
+        label="Location/Platform",
+        placeholder="Where will this happen? (e.g., Discord, In-person, Hybrid)",
+        required=True,
+        max_length=100,
+        style=discord.TextStyle.short
+    )
+    
+    contact_info = discord.ui.TextInput(
+        label="Contact Information",
+        placeholder="How should volunteers reach you? (Discord, email, etc.)",
+        required=False,
+        max_length=100,
+        style=discord.TextStyle.short
+    )
+
+    async def on_submit(self, interaction: discord.Interaction):
+        """Handle volunteer task creation submission."""
+        try:
+            # Validate inputs
+            if not self.task_title.value.strip():
+                await interaction.response.send_message(
+                    "❌ Task title is required!",
+                    ephemeral=True
+                )
+                return
+            
+            if not self.task_description.value.strip():
+                await interaction.response.send_message(
+                    "❌ Task description is required!",
+                    ephemeral=True
+                )
+                return
+            
+            discord_id = str(interaction.user.id)
+            discord_username = interaction.user.name
+            
+            # Create volunteer task
+            try:
+                task_id = db.create_volunteer_task(
+                    self.task_title.value.strip(),
+                    discord_id,
+                    discord_username
+                )
+            except Exception as e:
+                await interaction.response.send_message(
+                    "❌ Failed to create volunteer task. Please try again.",
+                    ephemeral=True
+                )
+                return
+            
+            # Create success response
+            embed = success_embed(
+                "🤝 Volunteer Task Created!",
+                f"**Task:** {self.task_title.value.strip()}\n**ID:** {task_id}"
+            )
+            
+            embed.add_field(
+                name="📝 Description",
+                value=self.task_description.value[:1024],
+                inline=False
+            )
+            
+            if self.required_skills.value:
+                embed.add_field(
+                    name="🔧 Required Skills",
+                    value=self.required_skills.value,
+                    inline=True
+                )
+            
+            embed.add_field(
+                name="⏰ Time Commitment",
+                value=self.time_commitment.value,
+                inline=True
+            )
+            
+            embed.add_field(
+                name="📍 Location",
+                value=self.location.value,
+                inline=True
+            )
+            
+            if self.contact_info.value:
+                embed.add_field(
+                    name="📞 Contact",
+                    value=self.contact_info.value,
+                    inline=True
+                )
+            
+            embed.add_field(
+                name="🎯 Next Steps",
+                value="• Share this task with potential volunteers\n• Use the buttons below to manage your task\n• Volunteers can join using the task ID",
+                inline=False
+            )
+            
+            # Get task data for the view
+            task_data = db.get_volunteer_task_by_id(task_id)
+            if task_data:
+                view = VolunteerTaskView(task_data, discord_id)
+                await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+            else:
+                await interaction.response.send_message(embed=embed, ephemeral=True)
+            
+        except Exception as e:
+            await interaction.response.send_message(
+                f"❌ Error creating volunteer task: {str(e)}",
+                ephemeral=True
+            )
+
 class VolunteerTaskView(discord.ui.View):
     """Interactive view for volunteer task actions."""
     
@@ -332,45 +479,13 @@ class VolunteerCog(commands.Cog):
         self.logger = bot.logger
 
     @volunteer_group.command(name="add", description="Create a new volunteer task")
-    @app_commands.describe(
-        title="Task title (5-100 characters)"
-    )
     @error_handler("volunteer-add")
     @cooldown(30)  # 30 second cooldown to prevent spam
-    async def add_task(self, interaction: discord.Interaction, title: str = None):
-        if title:
-            # Quick creation with just title
-            await defer_response(interaction, ephemeral=True)
-            
-            title = title.strip()
-            if not 5 <= len(title) <= 100:
-                raise ValidationError("Task title must be between 5-100 characters")
-            
-            try:
-                user = interaction.user
-                task_id = db.create_volunteer_task(title, str(user.id), user.name)
-                task_data = db.get_volunteer_task_by_id(task_id)
-                
-                embed = volunteer_task_embed(task_data)
-                embed.title = "✅ Task Created Successfully!"
-                embed.add_field(
-                    name="🎉 What's Next?",
-                    value="Your task is now live! Volunteers can join using the buttons below.",
-                    inline=False
-                )
-                
-                view = VolunteerTaskView(task_data, str(user.id))
-                await safe_send_response(interaction, embed=embed, view=view, ephemeral=True)
-                
-                self.logger.info(f"Volunteer task created: {title} by {user.name}")
-                
-            except Exception as e:
-                self.logger.error(f"Task creation error: {e}")
-                raise DatabaseError()
-        else:
-            # Show modal for detailed creation
-            modal = CreateTaskModal()
-            await interaction.response.send_modal(modal)
+    async def add_task(self, interaction: discord.Interaction):
+        """Open volunteer task creation modal."""
+        # Show modal for detailed creation
+        modal = VolunteerTaskCreationModal()
+        await interaction.response.send_modal(modal)
 
     @volunteer_group.command(name="list", description="List all volunteer tasks with interactive browsing")
     @app_commands.describe(

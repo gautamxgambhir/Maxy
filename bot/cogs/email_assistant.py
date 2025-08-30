@@ -12,6 +12,451 @@ from bot.email.placeholder_processor import placeholder_processor
 from bot.email.models import TemplateCategory, TemplateTone
 from config import Config
 
+class EmailCompositionModal(discord.ui.Modal, title="📧 Compose Email"):
+    """Comprehensive modal for email composition with all placeholders."""
+    
+    def __init__(self, template, category: str = None):
+        super().__init__()
+        self.template = template
+        self.category = category
+        
+        # Dynamically create text inputs based on template placeholders
+        self.placeholder_inputs = {}
+        
+        # Common placeholders for most email types
+        common_placeholders = {
+            'recipient_name': 'Recipient Name',
+            'recipient_email': 'Recipient Email',
+            'sender_name': 'Your Name',
+            'sender_email': 'Your Email',
+            'hackathon_name': 'Hackathon Name',
+            'event_date': 'Event Date',
+            'event_location': 'Event Location'
+        }
+        
+        # Category-specific placeholders
+        category_placeholders = {
+            'judges': {
+                'judge_role': 'Judge Role/Title',
+                'judging_criteria': 'Judging Criteria',
+                'judging_date': 'Judging Date',
+                'prize_amount': 'Prize Amount'
+            },
+            'sponsors': {
+                'sponsor_company': 'Sponsor Company',
+                'sponsorship_level': 'Sponsorship Level',
+                'sponsor_contact': 'Sponsor Contact Person',
+                'sponsor_phone': 'Sponsor Phone'
+            },
+            'participants': {
+                'participant_team': 'Team Name',
+                'project_title': 'Project Title',
+                'track_category': 'Track Category',
+                'mentor_name': 'Mentor Name'
+            },
+            'volunteers': {
+                'volunteer_role': 'Volunteer Role',
+                'shift_time': 'Shift Time',
+                'duties': 'Volunteer Duties',
+                'supervisor': 'Supervisor Name'
+            }
+        }
+        
+        # Combine common and category-specific placeholders
+        all_placeholders = common_placeholders.copy()
+        if category and category in category_placeholders:
+            all_placeholders.update(category_placeholders[category])
+        
+        # Create text inputs for each placeholder
+        for i, (key, label) in enumerate(all_placeholders.items()):
+            text_input = discord.ui.TextInput(
+                label=label,
+                placeholder=f"Enter {label.lower()}...",
+                required=True,
+                max_length=200,
+                style=discord.TextStyle.short
+            )
+            setattr(self, key, text_input)
+            self.placeholder_inputs[key] = text_input
+        
+        # Add custom message field
+        self.custom_message = discord.ui.TextInput(
+            label="Custom Message (Optional)",
+            placeholder="Add any additional personal message...",
+            required=False,
+            max_length=500,
+            style=discord.TextStyle.paragraph
+        )
+        
+        # Add subject and body preview fields
+        self.subject_preview = discord.ui.TextInput(
+            label="Subject Preview",
+            placeholder="Email subject will appear here...",
+            required=False,
+            max_length=200,
+            style=discord.TextStyle.short
+        )
+        
+        self.body_preview = discord.ui.TextInput(
+            label="Body Preview",
+            placeholder="Email body will appear here...",
+            required=False,
+            max_length=1000,
+            style=discord.TextStyle.paragraph
+        )
+
+    async def on_submit(self, interaction: discord.Interaction):
+        """Handle modal submission."""
+        try:
+            # Collect all placeholder values
+            placeholder_values = {}
+            for key, text_input in self.placeholder_inputs.items():
+                placeholder_values[key] = getattr(self, key).value
+            
+            # Process template with placeholders
+            processed_template = await placeholder_processor.process_template(
+                self.template, 
+                placeholder_values
+            )
+            
+            # Update preview fields
+            self.subject_preview.value = processed_template.get('subject', 'Subject not available')
+            self.body_preview.value = processed_template.get('body', 'Body not available')
+            
+            # Create confirmation view
+            view = EmailConfirmationView(
+                processed_template, 
+                placeholder_values, 
+                self.template,
+                self.category
+            )
+            
+            embed = discord.Embed(
+                title="📧 Email Ready to Send!",
+                description="Review your email below and choose an action:",
+                color=discord.Color.blue()
+            )
+            
+            embed.add_field(
+                name="📨 Subject",
+                value=processed_template.get('subject', 'No subject'),
+                inline=False
+            )
+            
+            body_preview = processed_template.get('body', 'No body')
+            if len(body_preview) > 1024:
+                body_preview = body_preview[:1021] + "..."
+            
+            embed.add_field(
+                name="📝 Body",
+                value=body_preview,
+                inline=False
+            )
+            
+            embed.add_field(
+                name="👤 Recipient",
+                value=f"{placeholder_values.get('recipient_name', 'N/A')} ({placeholder_values.get('recipient_email', 'N/A')})",
+                inline=True
+            )
+            
+            embed.add_field(
+                name="📋 Template",
+                value=f"{self.template.category}/{self.template.name}",
+                inline=True
+            )
+            
+            await interaction.response.send_message(
+                embed=embed,
+                view=view,
+                ephemeral=True
+            )
+            
+        except Exception as e:
+            await interaction.response.send_message(
+                f"❌ Error processing email: {str(e)}",
+                ephemeral=True
+            )
+
+class EmailConfirmationView(discord.ui.View):
+    """View for confirming and sending emails."""
+    
+    def __init__(self, processed_template, placeholder_values, template, category):
+        super().__init__(timeout=300)
+        self.processed_template = processed_template
+        self.placeholder_values = placeholder_values
+        self.template = template
+        self.category = category
+
+    @discord.ui.button(label="📧 Send Email", style=discord.ButtonStyle.success, emoji="✅")
+    async def send_email(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Send the email."""
+        try:
+            # Get the email assistant cog
+            cog = interaction.client.get_cog('EmailAssistantCog')
+            if not cog:
+                await interaction.response.send_message("❌ Email assistant not available.", ephemeral=True)
+                return
+            
+            # Send email
+            result = await cog.resend_client.send_email(
+                to=self.placeholder_values.get('recipient_email'),
+                subject=self.processed_template.get('subject'),
+                body=self.processed_template.get('body')
+            )
+            
+            # Log the email
+            await cog.email_logger.log_email(
+                template_id=self.template.id,
+                template_name=self.template.name,
+                recipient_email=self.placeholder_values.get('recipient_email'),
+                recipient_name=self.placeholder_values.get('recipient_name'),
+                status="sent" if result['success'] else "failed",
+                sent_by=interaction.user.id,
+                error_message=result.get('error')
+            )
+            
+            if result['success']:
+                embed = discord.Embed(
+                    title="✅ Email Sent Successfully!",
+                    description=f"**To:** {self.placeholder_values.get('recipient_name')}\n**Template:** {self.template.category}/{self.template.name}",
+                    color=discord.Color.green()
+                )
+                embed.add_field(
+                    name="📧 Details",
+                    value=f"**Subject:** {self.processed_template.get('subject')}\n**Sent at:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+                    inline=False
+                )
+            else:
+                embed = discord.Embed(
+                    title="❌ Email Failed to Send",
+                    description=f"**Error:** {result.get('error', 'Unknown error')}",
+                    color=discord.Color.red()
+                )
+            
+            await interaction.response.edit_message(embed=embed, view=None)
+            
+        except Exception as e:
+            await interaction.response.send_message(
+                f"❌ Error sending email: {str(e)}",
+                ephemeral=True
+            )
+
+    @discord.ui.button(label="📋 Copy Draft", style=discord.ButtonStyle.primary, emoji="📄")
+    async def copy_draft(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Copy the email draft."""
+        content = f"Subject: {self.processed_template.get('subject')}\n\n{self.processed_template.get('body')}"
+        
+        embed = discord.Embed(
+            title="📋 Email Draft Copied",
+            description="Copy the content below:",
+            color=discord.Color.blue()
+        )
+        embed.add_field(
+            name="📧 Email Content",
+            value=f"```\n{content[:1800]}\n```",
+            inline=False
+        )
+        
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    @discord.ui.button(label="✏️ Edit", style=discord.ButtonStyle.secondary, emoji="🔄")
+    async def edit_email(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Open edit modal."""
+        modal = EmailEditModal(
+            self.processed_template,
+            self.placeholder_values,
+            self.template,
+            self.category
+        )
+        await interaction.response.send_modal(modal)
+
+    @discord.ui.button(label="❌ Cancel", style=discord.ButtonStyle.danger, emoji="🚫")
+    async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Cancel the email."""
+        embed = discord.Embed(
+            title="❌ Email Cancelled",
+            description="Email composition has been cancelled.",
+            color=discord.Color.red()
+        )
+        await interaction.response.edit_message(embed=embed, view=None)
+
+class EmailEditModal(discord.ui.Modal, title="✏️ Edit Email"):
+    """Modal for editing email content."""
+    
+    def __init__(self, processed_template, placeholder_values, template, category):
+        super().__init__()
+        self.processed_template = processed_template
+        self.placeholder_values = placeholder_values
+        self.template = template
+        self.category = category
+        
+        # Editable fields
+        self.subject = discord.ui.TextInput(
+            label="Subject",
+            default=processed_template.get('subject', ''),
+            required=True,
+            max_length=200,
+            style=discord.TextStyle.short
+        )
+        
+        self.body = discord.ui.TextInput(
+            label="Body",
+            default=processed_template.get('body', ''),
+            required=True,
+            max_length=2000,
+            style=discord.TextStyle.paragraph
+        )
+        
+        self.recipient_email = discord.ui.TextInput(
+            label="Recipient Email",
+            default=placeholder_values.get('recipient_email', ''),
+            required=True,
+            max_length=254,
+            style=discord.TextStyle.short
+        )
+
+    async def on_submit(self, interaction: discord.Interaction):
+        """Handle edit submission."""
+        try:
+            # Update the processed template
+            self.processed_template['subject'] = self.subject.value
+            self.processed_template['body'] = self.body.value
+            self.placeholder_values['recipient_email'] = self.recipient_email.value
+            
+            # Create new confirmation view
+            view = EmailConfirmationView(
+                self.processed_template,
+                self.placeholder_values,
+                self.template,
+                self.category
+            )
+            
+            embed = discord.Embed(
+                title="✏️ Email Updated!",
+                description="Your email has been updated. Review and send:",
+                color=discord.Color.blue()
+            )
+            
+            embed.add_field(
+                name="📨 Subject",
+                value=self.processed_template['subject'],
+                inline=False
+            )
+            
+            body_preview = self.processed_template['body']
+            if len(body_preview) > 1024:
+                body_preview = body_preview[:1021] + "..."
+            
+            embed.add_field(
+                name="📝 Body",
+                value=body_preview,
+                inline=False
+            )
+            
+            await interaction.response.edit_message(embed=embed, view=view)
+            
+        except Exception as e:
+            await interaction.response.send_message(
+                f"❌ Error updating email: {str(e)}",
+                ephemeral=True
+            )
+
+class CategorySelectionView(discord.ui.View):
+    """View for selecting email categories."""
+    
+    def __init__(self):
+        super().__init__(timeout=300)
+
+    @discord.ui.button(label="👨‍⚖️ Judges", style=discord.ButtonStyle.primary, emoji="⚖️")
+    async def judges(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self._handle_category_selection(interaction, "judges")
+
+    @discord.ui.button(label="🏢 Sponsors", style=discord.ButtonStyle.primary, emoji="💼")
+    async def sponsors(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self._handle_category_selection(interaction, "sponsors")
+
+    @discord.ui.button(label="👥 Participants", style=discord.ButtonStyle.primary, emoji="🎯")
+    async def participants(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self._handle_category_selection(interaction, "participants")
+
+    @discord.ui.button(label="🤝 Volunteers", style=discord.ButtonStyle.primary, emoji="🆘")
+    async def volunteers(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self._handle_category_selection(interaction, "volunteers")
+
+    async def _handle_category_selection(self, interaction: discord.Interaction, category: str):
+        """Handle category selection and show template selection."""
+        try:
+            # Get templates for the selected category
+            templates = await template_manager.get_available_templates(category)
+            
+            if not templates:
+                embed = discord.Embed(
+                    title="❌ No Templates Available",
+                    description=f"No email templates found for {category.title()} category.",
+                    color=discord.Color.red()
+                )
+                await interaction.response.edit_message(embed=embed, view=None)
+                return
+            
+            # Create template selection view
+            view = TemplateSelectionView(category, templates)
+            
+            embed = discord.Embed(
+                title=f"📧 {category.title()} Email Templates",
+                description=f"Select a template to start composing your email:",
+                color=discord.Color.blue()
+            )
+            
+            for i, template in enumerate(templates[:5], 1):  # Show first 5 templates
+                embed.add_field(
+                    name=f"{i}. {template.name}",
+                    value=f"**Tone:** {template.tone}\n**Description:** {template.description[:100]}...",
+                    inline=False
+                )
+            
+            embed.set_footer(text="Click a template button to start composing your email")
+            
+            await interaction.response.edit_message(embed=embed, view=view)
+            
+        except Exception as e:
+            await interaction.response.send_message(
+                f"❌ Error loading templates: {str(e)}",
+                ephemeral=True
+            )
+
+class TemplateSelectionView(discord.ui.View):
+    """View for selecting email templates."""
+    
+    def __init__(self, category: str, templates):
+        super().__init__(timeout=300)
+        self.category = category
+        self.templates = templates
+        
+        # Create buttons for each template (max 5 to avoid clutter)
+        for i, template in enumerate(templates[:5]):
+            button = discord.ui.Button(
+                label=f"{template.name}",
+                style=discord.ButtonStyle.secondary,
+                custom_id=f"template_{i}"
+            )
+            button.callback = self.create_template_callback(template)
+            self.add_item(button)
+
+    def create_template_callback(self, template):
+        """Create a callback function for a specific template."""
+        async def template_callback(interaction: discord.Interaction):
+            try:
+                # Open the email composition modal
+                modal = EmailCompositionModal(template, self.category)
+                await interaction.response.send_modal(modal)
+            except Exception as e:
+                await interaction.response.send_message(
+                    f"❌ Error opening template: {str(e)}",
+                    ephemeral=True
+                )
+        
+        return template_callback
+
 class EmailActionView(discord.ui.View):
 
     def __init__(self, template, filled_subject: str, filled_body: str, placeholders: dict):
@@ -410,48 +855,37 @@ class EmailAssistantCog(commands.Cog):
     async def _handle_send_email_workflow(self, interaction: discord.Interaction):
         """Handle the email sending workflow."""
         try:
-            # already deferred at top-level
             if not self.resend_client:
-                try:
-                    await self._safe_send(interaction,
-                        "❌ Email sending is not configured. Please set up RESEND_API_KEY in your environment.",
-                        ephemeral=True
-                    )
-                except (discord.errors.InteractionResponded, discord.errors.NotFound):
-                    self.logger.warning("Could not send email config error - interaction already handled")
+                await interaction.response.send_message(
+                    "❌ Email sending is not configured. Please set up RESEND_API_KEY in your environment.",
+                    ephemeral=True
+                )
                 return
 
-            categories = [cat.value for cat in TemplateCategory]
+            # Create category selection view
+            view = CategorySelectionView()
             embed = discord.Embed(
                 title="📧 Send Email - Select Category",
                 description="Choose the type of email you want to send:",
                 color=discord.Color.green()
             )
+            
+            embed.add_field(
+                name="📋 Available Categories",
+                value="• **Judges** - Judge invitations and communications\n• **Sponsors** - Sponsor outreach and updates\n• **Participants** - Team communications and updates\n• **Volunteers** - Volunteer coordination and tasks",
+                inline=False
+            )
+            
+            embed.set_footer(text="Click a button below to select a category and start composing your email")
 
-            for i, category in enumerate(categories, 1):
-                embed.add_field(
-                    name=f"{i}. {category.replace('-', ' ').title()}",
-                    value=f"Use `/email-send category:{category}`",
-                    inline=False
-                )
-
-            embed.set_footer(text="Use the command with the category parameter to continue")
-
-            try:
-                await self._safe_send(interaction,embed=embed, ephemeral=True)
-            except (discord.errors.InteractionResponded, discord.errors.NotFound):
-                self.logger.warning("Could not send send email workflow response - interaction already handled")
+            await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
         except Exception as e:
             self.logger.error(f"Send email workflow error: {e}")
-            try:
-                if not interaction.is_expired():
-                    await self._safe_send(interaction,
-                        "❌ Failed to start email workflow.",
-                        ephemeral=True
-                    )
-            except Exception as followup_error:
-                self.logger.error(f"Failed to send workflow error followup: {followup_error}")
+            await interaction.response.send_message(
+                "❌ Failed to start email workflow.",
+                ephemeral=True
+            )
 
     async def _handle_view_stats(self, interaction: discord.Interaction):
         """Handle viewing email statistics."""

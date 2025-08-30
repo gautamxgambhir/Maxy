@@ -14,6 +14,140 @@ from bot.utils.error_handler import (
 )
 import logging
 
+class TeamCreationModal(discord.ui.Modal, title="🏆 Create Your Team"):
+    """Modal for team creation with comprehensive information."""
+    
+    def __init__(self):
+        super().__init__()
+    
+    team_name = discord.ui.TextInput(
+        label="Team Name",
+        placeholder="Enter your team name (e.g., CodeCrafters, Innovation Squad)",
+        required=True,
+        max_length=100,
+        style=discord.TextStyle.short
+    )
+    
+    team_description = discord.ui.TextInput(
+        label="Team Description",
+        placeholder="Describe your team's focus, goals, or what you're looking for...",
+        required=False,
+        max_length=500,
+        style=discord.TextStyle.paragraph
+    )
+    
+    project_idea = discord.ui.TextInput(
+        label="Project Idea (Optional)",
+        placeholder="Brief description of your project idea or area of interest...",
+        required=False,
+        max_length=300,
+        style=discord.TextStyle.paragraph
+    )
+    
+    looking_for = discord.ui.TextInput(
+        label="Looking For (Optional)",
+        placeholder="What skills or team members are you looking for? (e.g., Designer, Backend Developer)",
+        required=False,
+        max_length=200,
+        style=discord.TextStyle.short
+    )
+    
+    contact_info = discord.ui.TextInput(
+        label="Contact Info (Optional)",
+        placeholder="How should others contact you? (Discord, email, etc.)",
+        required=False,
+        max_length=100,
+        style=discord.TextStyle.short
+    )
+
+    async def on_submit(self, interaction: discord.Interaction):
+        """Handle team creation submission."""
+        try:
+            # Check if user already has a profile
+            discord_id = str(interaction.user.id)
+            profile = db.get_profile(discord_id)
+            if not profile:
+                await interaction.response.send_message(
+                    "❌ You need to create a profile first! Use `/register-profile` to get started.",
+                    ephemeral=True
+                )
+                return
+            
+            # Check if user is already in a team
+            existing_team = db.get_team_by_member(discord_id)
+            if existing_team:
+                await interaction.response.send_message(
+                    "❌ You're already in a team! Leave your current team first to create a new one.",
+                    ephemeral=True
+                )
+                return
+            
+            # Create team
+            try:
+                team_id, team_code = db.create_team(
+                    self.team_name.value,
+                    discord_id,
+                    interaction.user.name
+                )
+            except Exception as e:
+                await interaction.response.send_message(
+                    "❌ Failed to create team. Please try again.",
+                    ephemeral=True
+                )
+                return
+            
+            # Create success response
+            embed = success_embed(
+                "🏆 Team Created Successfully!",
+                f"**Team:** {self.team_name.value}\n**Code:** `{team_code}`"
+            )
+            
+            if self.team_description.value:
+                embed.add_field(
+                    name="📝 Description",
+                    value=self.team_description.value,
+                    inline=False
+                )
+            
+            if self.project_idea.value:
+                embed.add_field(
+                    name="💡 Project Idea",
+                    value=self.project_idea.value,
+                    inline=False
+                )
+            
+            if self.looking_for.value:
+                embed.add_field(
+                    name="🔍 Looking For",
+                    value=self.looking_for.value,
+                    inline=True
+                )
+            
+            if self.contact_info.value:
+                embed.add_field(
+                    name="📞 Contact",
+                    value=self.contact_info.value,
+                    inline=True
+                )
+            
+            embed.add_field(
+                name="🎯 Next Steps",
+                value="• Share your team code with others\n• Use the buttons below to manage your team\n• Invite members with `/join-team`",
+                inline=False
+            )
+            
+            # Get team data for the view
+            team_data = db.get_team_by_member(discord_id)
+            view = TeamManagementView(team_data, discord_id)
+            
+            await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+            
+        except Exception as e:
+            await interaction.response.send_message(
+                f"❌ Error creating team: {str(e)}",
+                ephemeral=True
+            )
+
 class TeamManagementView(discord.ui.View):
     """Interactive view for team management actions."""
     
@@ -256,23 +390,11 @@ class TeamCog(commands.Cog):
         name="create-team", 
         description="Create a new team for hackathons and collaborations"
     )
-    @app_commands.describe(
-        name="Your team name (2-50 characters)"
-    )
     @error_handler("create-team")
     @validate_profile_exists
     @cooldown(30)  # 30 second cooldown to prevent spam
-    async def create_team(self, interaction: discord.Interaction, name: str):
-        await defer_response(interaction, ephemeral=True)
-        
-        # Validate team name
-        name = name.strip()
-        if not 2 <= len(name) <= 50:
-            raise ValidationError("Team name must be between 2-50 characters")
-        
-        if any(char in name for char in ['<', '>', '@', '#', '`']):
-            raise ValidationError("Team name contains invalid characters")
-        
+    async def create_team(self, interaction: discord.Interaction):
+        """Open team creation modal."""
         # Check if user is already in a team
         current_team = db.get_team_by_member(str(interaction.user.id))
         if current_team:
@@ -293,51 +415,16 @@ class TeamCog(commands.Cog):
             team_embed = team_info_embed(team_data)
             view = TeamManagementView(current_team, str(interaction.user.id))
             
-            await safe_send_response(
-                interaction,
+            await interaction.response.send_message(
                 embed=team_embed,
                 view=view,
                 ephemeral=True
             )
             return
         
-        discord_id = str(interaction.user.id)
-        discord_username = interaction.user.name
-        
-        try:
-            team_id, code = db.create_team(name, discord_id, discord_username)
-        except Exception as e:
-            self.logger.error(f"Team creation error: {e}")
-            raise DatabaseError()
-        
-        # Create team info
-        team_data = {
-            'name': name,
-            'code': code,
-            'owner': discord_username,
-            'members': [discord_username]
-        }
-        
-        embed = team_info_embed(team_data)
-        embed.title = "✅ Team Created Successfully!"
-        embed.add_field(
-            name="🎉 Next Steps",
-            value="• Share your invite code with teammates\n• Use the buttons below to manage your team\n• Start collaborating on hackathon projects!",
-            inline=False
-        )
-        
-        # Get team data for management view
-        team_db_data = db.get_team_by_member(discord_id)
-        view = TeamManagementView(team_db_data, discord_id)
-        
-        await safe_send_response(
-            interaction,
-            embed=embed,
-            view=view,
-            ephemeral=True
-        )
-        
-        self.logger.info(f"Team created: {name} by {discord_username} ({discord_id})")
+        # Open team creation modal
+        modal = TeamCreationModal()
+        await interaction.response.send_modal(modal)
 
     @app_commands.command(
         name="join-team", 

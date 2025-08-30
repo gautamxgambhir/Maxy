@@ -10,6 +10,238 @@ from bot.utils.error_handler import (
 )
 import logging
 
+class ProfileRegistrationModal(discord.ui.Modal, title="👤 Create Your Profile"):
+    """Comprehensive modal for profile registration."""
+    
+    def __init__(self):
+        super().__init__()
+    
+    name = discord.ui.TextInput(
+        label="Full Name",
+        placeholder="Enter your full name (e.g., John Doe)",
+        required=True,
+        max_length=100,
+        style=discord.TextStyle.short
+    )
+    
+    skills = discord.ui.TextInput(
+        label="Skills & Expertise",
+        placeholder="Enter your skills separated by commas (e.g., Python, React, UI/UX, Project Management)",
+        required=False,
+        max_length=500,
+        style=discord.TextStyle.paragraph
+    )
+    
+    interests = discord.ui.TextInput(
+        label="Interests & Goals",
+        placeholder="What are you passionate about? (e.g., AI, Sustainability, Gaming, Social Impact)",
+        required=False,
+        max_length=500,
+        style=discord.TextStyle.paragraph
+    )
+    
+    github = discord.ui.TextInput(
+        label="GitHub Profile (Optional)",
+        placeholder="Your GitHub username or profile URL",
+        required=False,
+        max_length=100,
+        style=discord.TextStyle.short
+    )
+    
+    portfolio = discord.ui.TextInput(
+        label="Portfolio/Website (Optional)",
+        placeholder="Your portfolio website or LinkedIn profile",
+        required=False,
+        max_length=200,
+        style=discord.TextStyle.short
+    )
+    
+    bio = discord.ui.TextInput(
+        label="Bio (Optional)",
+        placeholder="Tell us about yourself in a few sentences...",
+        required=False,
+        max_length=300,
+        style=discord.TextStyle.paragraph
+    )
+
+    async def on_submit(self, interaction: discord.Interaction):
+        """Handle profile registration submission."""
+        try:
+            # Validate inputs
+            try:
+                validated_name = validation.validate_name(self.name.value)
+                validated_skills = validation.validate_skills(self.skills.value) if self.skills.value else ""
+                validated_interests = validation.validate_interests(self.interests.value) if self.interests.value else ""
+            except ValueError as e:
+                await interaction.response.send_message(
+                    f"❌ Validation error: {str(e)}\nPlease check your input format and try again.",
+                    ephemeral=True
+                )
+                return
+            
+            discord_id = str(interaction.user.id)
+            discord_username = interaction.user.name
+            
+            # Check if profile already exists
+            existing_profile = db.get_profile(discord_id)
+            if existing_profile:
+                embed = info_embed(
+                    "Profile Already Exists",
+                    "You already have a profile! Use `/edit-profile` to update it."
+                )
+                await interaction.response.send_message(embed=embed, ephemeral=True)
+                return
+            
+            # Create profile
+            try:
+                db.upsert_profile(
+                    discord_id,
+                    discord_username,
+                    validated_name,
+                    validated_skills,
+                    validated_interests
+                )
+            except Exception as e:
+                await interaction.response.send_message(
+                    "❌ Database error creating profile. Please try again.",
+                    ephemeral=True
+                )
+                return
+            
+            # Create success response
+            profile_data = {
+                'name': validated_name,
+                'discord_username': discord_username,
+                'skills': validated_skills,
+                'interests': validated_interests
+            }
+            
+            embed = profile_embed(profile_data)
+            embed.title = "✅ Profile Created Successfully!"
+            embed.add_field(
+                name="🎉 Welcome to Maximally!",
+                value="Your profile helps others find teammates with complementary skills. Use `/edit-profile` to update it anytime.",
+                inline=False
+            )
+            
+            if self.github.value:
+                embed.add_field(name="🔗 GitHub", value=self.github.value, inline=True)
+            if self.portfolio.value:
+                embed.add_field(name="🌐 Portfolio", value=self.portfolio.value, inline=True)
+            if self.bio.value:
+                embed.add_field(name="📝 Bio", value=self.bio.value, inline=False)
+            
+            view = ProfileActionView(discord_id)
+            await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+            
+        except Exception as e:
+            await interaction.response.send_message(
+                f"❌ Error creating profile: {str(e)}",
+                ephemeral=True
+            )
+
+class ProfileEditModal(discord.ui.Modal, title="✏️ Edit Your Profile"):
+    """Modal for editing profile information."""
+    
+    def __init__(self, current_profile):
+        super().__init__()
+        self.current_profile = current_profile
+    
+    name = discord.ui.TextInput(
+        label="Full Name",
+        default=current_profile.get('name', ''),
+        placeholder="Enter your full name",
+        required=True,
+        max_length=100,
+        style=discord.TextStyle.short
+    )
+    
+    skills = discord.ui.TextInput(
+        label="Skills & Expertise",
+        default=current_profile.get('skills', ''),
+        placeholder="Enter your skills separated by commas",
+        required=False,
+        max_length=500,
+        style=discord.TextStyle.paragraph
+    )
+    
+    interests = discord.ui.TextInput(
+        label="Interests & Goals",
+        default=current_profile.get('interests', ''),
+        placeholder="What are you passionate about?",
+        required=False,
+        max_length=500,
+        style=discord.TextStyle.paragraph
+    )
+    
+    bio = discord.ui.TextInput(
+        label="Bio (Optional)",
+        default=current_profile.get('bio', ''),
+        placeholder="Tell us about yourself...",
+        required=False,
+        max_length=300,
+        style=discord.TextStyle.paragraph
+    )
+
+    async def on_submit(self, interaction: discord.Interaction):
+        """Handle profile edit submission."""
+        try:
+            # Validate inputs
+            try:
+                validated_name = validation.validate_name(self.name.value)
+                validated_skills = validation.validate_skills(self.skills.value) if self.skills.value else ""
+                validated_interests = validation.validate_interests(self.interests.value) if self.interests.value else ""
+            except ValueError as e:
+                await interaction.response.send_message(
+                    f"❌ Validation error: {str(e)}\nPlease check your input format and try again.",
+                    ephemeral=True
+                )
+                return
+            
+            discord_id = str(interaction.user.id)
+            discord_username = interaction.user.name
+            
+            # Update profile
+            try:
+                db.upsert_profile(
+                    discord_id,
+                    discord_username,
+                    validated_name,
+                    validated_skills,
+                    validated_interests
+                )
+            except Exception as e:
+                await interaction.response.send_message(
+                    "❌ Database error updating profile. Please try again.",
+                    ephemeral=True
+                )
+                return
+            
+            # Create success response
+            profile_data = {
+                'name': validated_name,
+                'discord_username': discord_username,
+                'skills': validated_skills,
+                'interests': validated_interests
+            }
+            
+            embed = profile_embed(profile_data)
+            embed.title = "✅ Profile Updated Successfully!"
+            embed.add_field(
+                name="🔄 Changes Saved",
+                value="Your profile has been updated with the new information.",
+                inline=False
+            )
+            
+            view = ProfileActionView(discord_id)
+            await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+            
+        except Exception as e:
+            await interaction.response.send_message(
+                f"❌ Error updating profile: {str(e)}",
+                ephemeral=True
+            )
+
 class ProfileActionView(discord.ui.View):
     """Interactive view for profile actions."""
     
@@ -25,7 +257,15 @@ class ProfileActionView(discord.ui.View):
             )
             return
         
-        modal = ProfileEditModal()
+        # Get current profile data
+        current_profile = db.get_profile(self.user_id)
+        if not current_profile:
+            await interaction.response.send_message(
+                "❌ Profile not found!", ephemeral=True
+            )
+            return
+        
+        modal = ProfileEditModal(current_profile)
         await interaction.response.send_modal(modal)
     
     @discord.ui.button(label="🔍 Find Similar", style=discord.ButtonStyle.secondary)
@@ -192,22 +432,10 @@ class ProfileCog(commands.Cog):
         name="register-profile",
         description="Create your profile to connect with other hackathon participants"
     )
-    @app_commands.describe(
-        name="Your full name (2-100 characters)",
-        skills="Your technical skills (comma separated, optional)",
-        interests="Your interests and areas of focus (comma separated, optional)"
-    )
     @error_handler("register-profile")
     @cooldown(10)  # 10 second cooldown to prevent spam
-    async def register_profile(
-        self,
-        interaction: discord.Interaction,
-        name: str,
-        skills: str = "",
-        interests: str = ""
-    ):
-        await defer_response(interaction, ephemeral=True)
-        
+    async def register_profile(self, interaction: discord.Interaction):
+        """Open profile registration modal."""
         # Check if profile already exists
         existing_profile = db.get_profile(str(interaction.user.id))
         if existing_profile:
@@ -226,63 +454,16 @@ class ProfileCog(commands.Cog):
             profile_embed_obj = profile_embed(profile_data)
             view = ProfileActionView(str(interaction.user.id))
             
-            await safe_send_response(
-                interaction,
+            await interaction.response.send_message(
                 embed=profile_embed_obj,
                 view=view,
                 ephemeral=True
             )
             return
         
-        # Validate inputs
-        try:
-            validated_name = validation.validate_name(name)
-            validated_skills = validation.validate_skills(skills)
-            validated_interests = validation.validate_interests(interests)
-        except ValueError as e:
-            raise ValidationError(str(e), "Please check your input format and try again.")
-        
-        discord_id = str(interaction.user.id)
-        discord_username = interaction.user.name
-        
-        # Create profile
-        try:
-            db.upsert_profile(
-                discord_id,
-                discord_username,
-                validated_name,
-                validated_skills,
-                validated_interests
-            )
-        except Exception as e:
-            self.logger.error(f"Database error creating profile: {e}")
-            raise DatabaseError()
-        
-        # Create success response
-        profile_data = {
-            'name': validated_name,
-            'discord_username': discord_username,
-            'skills': validated_skills,
-            'interests': validated_interests
-        }
-        
-        embed = profile_embed(profile_data)
-        embed.title = "✅ Profile Created Successfully!"
-        embed.add_field(
-            name="🎉 Welcome to Maximally!",
-            value="Your profile helps others find teammates with complementary skills. Use the buttons below to manage your profile.",
-            inline=False
-        )
-        
-        view = ProfileActionView(discord_id)
-        await safe_send_response(
-            interaction,
-            embed=embed,
-            view=view,
-            ephemeral=True
-        )
-        
-        self.logger.info(f"Profile created for {discord_username} ({discord_id})")
+        # Open profile registration modal
+        modal = ProfileRegistrationModal()
+        await interaction.response.send_modal(modal)
 
     @app_commands.command(
         name="edit-profile",
