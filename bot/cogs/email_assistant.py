@@ -278,11 +278,13 @@ class EmailAssistantCog(commands.Cog):
         except Exception as e:
             self.logger.exception(f"Email command error: {e}")
             try:
-                await self._safe_send(
-                    interaction,
-                    "❌ An error occurred. Please try again later.",
-                    ephemeral=True
-                )
+                # Avoid sending an additional error banner if the interaction is already acknowledged
+                if not interaction.response.is_done():
+                    await self._safe_send(
+                        interaction,
+                        "❌ An error occurred. Please try again later.",
+                        ephemeral=True
+                    )
             except Exception:
                 pass
 
