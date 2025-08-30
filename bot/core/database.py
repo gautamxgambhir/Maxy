@@ -34,6 +34,16 @@ class Database:
             else:
                 raise
 
+    def _row_to_dict(self, row):
+        """Safely convert database row to dictionary regardless of backend."""
+        if row is None:
+            return None
+        if self.mode == "postgres":
+            return dict(row)
+        else:
+            # SQLite Row object
+            return {key: row[key] for key in row.keys()}
+
     @contextmanager
     def get_connection(self):
         """Return a connection depending on mode (Postgres or SQLite)."""
@@ -189,7 +199,8 @@ class Database:
             cursor = conn.cursor()
             query = "SELECT * FROM profiles WHERE discord_id = %s" if self.mode == "postgres" else "SELECT * FROM profiles WHERE discord_id = ?"
             cursor.execute(query, (discord_id,))
-            return cursor.fetchone()
+            row = cursor.fetchone()
+            return self._row_to_dict(row)
 
     def search_profiles(self, skills=None, interests=None, limit=10):
         with self.get_connection() as conn:
@@ -215,7 +226,8 @@ class Database:
             params.append(limit)
 
             cursor.execute(query, tuple(params))
-            return cursor.fetchall()
+            rows = cursor.fetchall()
+            return [self._row_to_dict(row) for row in rows]
 
     # ---------------- TEAM METHODS ---------------- #
 
@@ -271,7 +283,8 @@ class Database:
             cursor = conn.cursor()
             query = "SELECT * FROM teams WHERE code = %s" if self.mode == "postgres" else "SELECT * FROM teams WHERE code = ?"
             cursor.execute(query, (code,))
-            return cursor.fetchone()
+            row = cursor.fetchone()
+            return self._row_to_dict(row)
 
     def get_team_by_member(self, discord_id):
         with self.get_connection() as conn:
@@ -288,14 +301,16 @@ class Database:
                 WHERE tm.discord_id = ?
             '''
             cursor.execute(query, (discord_id,))
-            return cursor.fetchone()
+            row = cursor.fetchone()
+            return self._row_to_dict(row)
 
     def get_team_members(self, team_id):
         with self.get_connection() as conn:
             cursor = conn.cursor()
             query = "SELECT * FROM team_members WHERE team_id = %s ORDER BY joined_at" if self.mode == "postgres" else "SELECT * FROM team_members WHERE team_id = ? ORDER BY joined_at"
             cursor.execute(query, (team_id,))
-            return cursor.fetchall()
+            rows = cursor.fetchall()
+            return [self._row_to_dict(row) for row in rows]
 
     def delete_team_if_empty(self, team_id):
         with self.get_connection() as conn:
@@ -355,13 +370,15 @@ class Database:
             cursor = conn.cursor()
             query = "SELECT * FROM volunteer_tasks WHERE id = %s" if self.mode == "postgres" else "SELECT * FROM volunteer_tasks WHERE id = ?"
             cursor.execute(query, (task_id,))
-            return cursor.fetchone()
+            row = cursor.fetchone()
+            return self._row_to_dict(row)
 
     def get_all_volunteer_tasks(self):
         with self.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT * FROM volunteer_tasks ORDER BY created_at DESC")
-            return cursor.fetchall()
+            rows = cursor.fetchall()
+            return [self._row_to_dict(row) for row in rows]
 
     def join_volunteer_task(self, task_id, discord_id, discord_username):
         with self.get_connection() as conn:
@@ -396,7 +413,8 @@ class Database:
             # Get tasks created by user
             created_query = "SELECT * FROM volunteer_tasks WHERE creator_id = %s ORDER BY created_at DESC" if self.mode == "postgres" else "SELECT * FROM volunteer_tasks WHERE creator_id = ? ORDER BY created_at DESC"
             cursor.execute(created_query, (discord_id,))
-            created = cursor.fetchall()
+            created_rows = cursor.fetchall()
+            created = [self._row_to_dict(row) for row in created_rows]
 
             # Get tasks joined by user
             joined_query = '''
@@ -409,7 +427,8 @@ class Database:
                 WHERE vp.discord_id = ? ORDER BY vp.joined_at DESC
             '''
             cursor.execute(joined_query, (discord_id,))
-            joined = cursor.fetchall()
+            joined_rows = cursor.fetchall()
+            joined = [self._row_to_dict(row) for row in joined_rows]
 
             return {"created": created, "joined": joined}
 

@@ -26,14 +26,26 @@ class FindCog(commands.Cog):
         limit: app_commands.Range[int, 1, 20] = 10
     ):
         try:
+            # Check if interaction is still valid
+            if interaction.is_expired():
+                self.logger.warning("Interaction has expired, cannot respond")
+                return
+
             # Defer the response since we do database operations
-            await interaction.response.defer(ephemeral=True)
+            try:
+                await interaction.response.defer(ephemeral=True)
+            except discord.errors.InteractionResponded:
+                self.logger.warning("Interaction already responded to")
+                return
 
             if not skills and not interests:
-                await interaction.followup.send(
-                    "⚠️ Please provide at least one search criteria",
-                    ephemeral=True
-                )
+                try:
+                    await interaction.followup.send(
+                        "[WARNING] Please provide at least one search criteria",
+                        ephemeral=True
+                    )
+                except (discord.errors.InteractionResponded, discord.errors.NotFound):
+                    self.logger.warning("Could not send search criteria warning - interaction already handled")
                 return
 
             results = db.search_profiles(
@@ -43,22 +55,29 @@ class FindCog(commands.Cog):
             )
 
             if not results:
-                await interaction.followup.send(
-                    "🔍 No profiles found matching your criteria",
-                    ephemeral=True
-                )
+                try:
+                    await interaction.followup.send(
+                        "[SEARCH] No profiles found matching your criteria",
+                        ephemeral=True
+                    )
+                except (discord.errors.InteractionResponded, discord.errors.NotFound):
+                    self.logger.warning("Could not send no results message - interaction already handled")
                 return
 
             embed = search_results_embed(results)
-            await interaction.followup.send(embed=embed, ephemeral=True)
+            try:
+                await interaction.followup.send(embed=embed, ephemeral=True)
+            except (discord.errors.InteractionResponded, discord.errors.NotFound):
+                self.logger.warning("Could not send search results - interaction already handled")
             self.logger.info(f"Search completed for {interaction.user}")
 
         except Exception as e:
             self.logger.error(f"Find command error: {str(e)}")
             try:
-                await interaction.followup.send(
-                    "❌ Error searching profiles. Please try again later.",
-                    ephemeral=True
-                )
+                if not interaction.is_expired():
+                    await interaction.followup.send(
+                        "[ERROR] Error searching profiles. Please try again later.",
+                        ephemeral=True
+                    )
             except Exception as followup_error:
-                self.logger.error(f"Failed to send followup: {followup_error}")
+                self.logger.error(f"Failed to send find error followup: {followup_error}")

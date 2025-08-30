@@ -27,8 +27,17 @@ class ProfileCog(commands.Cog):
         interests: str
     ):
         try:
+            # Check if interaction is still valid
+            if interaction.is_expired():
+                self.logger.warning("Interaction has expired, cannot respond")
+                return
+
             # Defer the response since we do database operations
-            await interaction.response.defer(ephemeral=True)
+            try:
+                await interaction.response.defer(ephemeral=True)
+            except discord.errors.InteractionResponded:
+                self.logger.warning("Interaction already responded to")
+                return
 
             name = validation.validate_name(name)
             skills = validation.validate_skills(skills)
@@ -53,30 +62,35 @@ class ProfileCog(commands.Cog):
             }
             embed = profile_embed(profile)
 
-            await interaction.followup.send(
-                embed=embed,
-                ephemeral=True,
-                content="✅ Profile created successfully!"
-            )
+            try:
+                await interaction.followup.send(
+                    embed=embed,
+                    ephemeral=True,
+                    content="[SUCCESS] Profile created successfully!"
+                )
+            except (discord.errors.InteractionResponded, discord.errors.NotFound):
+                self.logger.warning("Could not send profile creation response - interaction already handled")
             self.logger.info(f"Profile registered for {discord_username}")
 
         except ValueError as e:
             try:
-                await interaction.followup.send(
-                    f"❌ Validation error: {str(e)}",
-                    ephemeral=True
-                )
+                if not interaction.is_expired():
+                    await interaction.followup.send(
+                        f"[ERROR] Validation error: {str(e)}",
+                        ephemeral=True
+                    )
             except Exception as followup_error:
-                self.logger.error(f"Failed to send followup: {followup_error}")
+                self.logger.error(f"Failed to send validation error followup: {followup_error}")
         except Exception as e:
             self.logger.error(f"Profile registration error: {str(e)}")
             try:
-                await interaction.followup.send(
-                    "❌ Failed to create profile. Please try again later.",
-                    ephemeral=True
-                )
+                if not interaction.is_expired():
+                    await interaction.followup.send(
+                        "[ERROR] Failed to create profile. Please try again later.",
+                        ephemeral=True
+                    )
             except Exception as followup_error:
-                self.logger.error(f"Failed to send followup: {followup_error}")
+                self.logger.error(f"Failed to send registration error followup: {followup_error}")
 
     @app_commands.command(
         name="edit-profile",
@@ -95,17 +109,29 @@ class ProfileCog(commands.Cog):
         interests: str = None
     ):
         try:
+            # Check if interaction is still valid
+            if interaction.is_expired():
+                self.logger.warning("Interaction has expired, cannot respond")
+                return
+
             # Defer the response since we do database operations
-            await interaction.response.defer(ephemeral=True)
+            try:
+                await interaction.response.defer(ephemeral=True)
+            except discord.errors.InteractionResponded:
+                self.logger.warning("Interaction already responded to")
+                return
 
             discord_id = str(interaction.user.id)
             current_profile = db.get_profile(discord_id)
 
             if not current_profile:
-                await interaction.followup.send(
-                    "❌ You don't have a profile yet. Use `/register-profile` first.",
-                    ephemeral=True
-                )
+                try:
+                    await interaction.followup.send(
+                        "[ERROR] You don't have a profile yet. Use `/register-profile` first.",
+                        ephemeral=True
+                    )
+                except (discord.errors.InteractionResponded, discord.errors.NotFound):
+                    self.logger.warning("Could not send no profile error - interaction already handled")
                 return
 
             name = name or current_profile['name']
@@ -134,30 +160,35 @@ class ProfileCog(commands.Cog):
             }
             embed = profile_embed(profile)
 
-            await interaction.followup.send(
-                embed=embed,
-                ephemeral=True,
-                content="✅ Profile updated successfully!"
-            )
+            try:
+                await interaction.followup.send(
+                    embed=embed,
+                    ephemeral=True,
+                    content="[SUCCESS] Profile updated successfully!"
+                )
+            except (discord.errors.InteractionResponded, discord.errors.NotFound):
+                self.logger.warning("Could not send profile update response - interaction already handled")
             self.logger.info(f"Profile updated for {discord_username}")
 
         except ValueError as e:
             try:
-                await interaction.followup.send(
-                    f"❌ Validation error: {str(e)}",
-                    ephemeral=True
-                )
+                if not interaction.is_expired():
+                    await interaction.followup.send(
+                        f"[ERROR] Validation error: {str(e)}",
+                        ephemeral=True
+                    )
             except Exception as followup_error:
-                self.logger.error(f"Failed to send followup: {followup_error}")
+                self.logger.error(f"Failed to send validation error followup: {followup_error}")
         except Exception as e:
             self.logger.error(f"Profile edit error: {str(e)}")
             try:
-                await interaction.followup.send(
-                    "❌ Failed to update profile. Please try again later.",
-                    ephemeral=True
-                )
+                if not interaction.is_expired():
+                    await interaction.followup.send(
+                        "[ERROR] Failed to update profile. Please try again later.",
+                        ephemeral=True
+                    )
             except Exception as followup_error:
-                self.logger.error(f"Failed to send followup: {followup_error}")
+                self.logger.error(f"Failed to send edit error followup: {followup_error}")
 
     @app_commands.command(
         name="view-profile",
@@ -168,17 +199,29 @@ class ProfileCog(commands.Cog):
         interaction: discord.Interaction
     ):
         try:
+            # Check if interaction is still valid
+            if interaction.is_expired():
+                self.logger.warning("Interaction has expired, cannot respond")
+                return
+
             # Defer the response since we do database operations
-            await interaction.response.defer(ephemeral=True)
+            try:
+                await interaction.response.defer(ephemeral=True)
+            except discord.errors.InteractionResponded:
+                self.logger.warning("Interaction already responded to")
+                return
 
             discord_id = str(interaction.user.id)
             profile = db.get_profile(discord_id)
 
             if not profile:
-                await interaction.followup.send(
-                    "❌ You don't have a profile yet. Use `/register-profile` to create one.",
-                    ephemeral=True
-                )
+                try:
+                    await interaction.followup.send(
+                        "[ERROR] You don't have a profile yet. Use `/register-profile` to create one.",
+                        ephemeral=True
+                    )
+                except (discord.errors.InteractionResponded, discord.errors.NotFound):
+                    self.logger.warning("Could not send no profile error - interaction already handled")
                 return
 
             profile_data = {
@@ -189,21 +232,25 @@ class ProfileCog(commands.Cog):
             }
             embed = profile_embed(profile_data)
 
-            await interaction.followup.send(
-                embed=embed,
-                ephemeral=True
-            )
+            try:
+                await interaction.followup.send(
+                    embed=embed,
+                    ephemeral=True
+                )
+            except (discord.errors.InteractionResponded, discord.errors.NotFound):
+                self.logger.warning("Could not send profile view response - interaction already handled")
             self.logger.info(f"Profile viewed by {profile['discord_username']}")
 
         except Exception as e:
             self.logger.error(f"Profile view error: {str(e)}")
             try:
-                await interaction.followup.send(
-                    "❌ Failed to retrieve profile. Please try again later.",
-                    ephemeral=True
-                )
+                if not interaction.is_expired():
+                    await interaction.followup.send(
+                        "[ERROR] Failed to retrieve profile. Please try again later.",
+                        ephemeral=True
+                    )
             except Exception as followup_error:
-                self.logger.error(f"Failed to send followup: {followup_error}")
+                self.logger.error(f"Failed to send view error followup: {followup_error}")
 
 async def setup(bot):
     await bot.add_cog(ProfileCog(bot))

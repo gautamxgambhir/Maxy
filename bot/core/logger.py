@@ -2,11 +2,23 @@ import logging
 import logging.handlers
 import sys
 import os
+import io
 from config import config as Config
 
 def setup_logging(level="INFO", log_file=None, max_bytes=10*1024*1024, backup_count=5):
     """Setup production-ready logging with rotation."""
     log_level = getattr(logging, level.upper(), logging.INFO)
+
+    # Fix Windows console encoding for Unicode support
+    if os.name == 'nt':  # Windows
+        try:
+            # Set console to UTF-8 encoding
+            import ctypes
+            kernel32 = ctypes.windll.kernel32
+            kernel32.SetConsoleOutputCP(65001)  # UTF-8 codepage
+            kernel32.SetConsoleCP(65001)  # UTF-8 input codepage
+        except:
+            pass  # Ignore if setting encoding fails
 
     # Create logs directory if it doesn't exist
     log_dir = os.path.dirname(log_file) if log_file else "logs"
@@ -30,8 +42,14 @@ def setup_logging(level="INFO", log_file=None, max_bytes=10*1024*1024, backup_co
     # Setup handlers
     handlers = []
 
-    # Console handler
-    console_handler = logging.StreamHandler(sys.stdout)
+    # Console handler with UTF-8 encoding
+    try:
+        # Try to create a UTF-8 encoded stream handler
+        console_handler = logging.StreamHandler(io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8'))
+    except:
+        # Fallback to regular handler if UTF-8 wrapper fails
+        console_handler = logging.StreamHandler(sys.stdout)
+
     console_handler.setLevel(log_level)
     console_handler.setFormatter(simple_formatter)
     handlers.append(console_handler)

@@ -30,7 +30,7 @@ def validate_config():
 
 def signal_handler(signum, frame):
     """Handle shutdown signals gracefully."""
-    print(f"\n🛑 Received signal {signum}, shutting down gracefully...")
+    print(f"\n[SHUTDOWN] Received signal {signum}, shutting down gracefully...")
     sys.exit(0)
 
 async def main():
@@ -53,7 +53,7 @@ async def main():
         signal.signal(signal.SIGINT, signal_handler)
         signal.signal(signal.SIGTERM, signal_handler)
 
-        logger.info("🤖 Bot starting up...")
+        logger.info("[BOT] Bot starting up...")
         await bot.start(Config.DISCORD_TOKEN)
 
     except KeyboardInterrupt:

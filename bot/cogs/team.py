@@ -14,21 +14,38 @@ class TeamCog(commands.Cog):
     @app_commands.describe(name="Your team name")
     async def create_team(self, interaction: discord.Interaction, name: str):
         try:
-            await interaction.response.defer(ephemeral=True)
+            # Check if interaction is still valid
+            if interaction.is_expired():
+                self.logger.warning("Interaction has expired, cannot respond")
+                return
+
+            # Defer the response since we do database operations
+            try:
+                await interaction.response.defer(ephemeral=True)
+            except discord.errors.InteractionResponded:
+                self.logger.warning("Interaction already responded to")
+                return
+
             profile = db.get_profile(str(interaction.user.id))
             if not profile:
-                await interaction.followup.send(
-                    "❌ You need to create a profile first using `/register-profile`",
-                    ephemeral=True,
-                )
+                try:
+                    await interaction.followup.send(
+                        "[ERROR] You need to create a profile first using `/register-profile`",
+                        ephemeral=True,
+                    )
+                except (discord.errors.InteractionResponded, discord.errors.NotFound):
+                    self.logger.warning("Could not send profile error - interaction already handled")
                 return
 
             current_team = db.get_team_by_member(str(interaction.user.id))
             if current_team:
-                await interaction.followup.send(
-                    "❌ You're already in a team! Leave your current team first.",
-                    ephemeral=True,
-                )
+                try:
+                    await interaction.followup.send(
+                        "[ERROR] You're already in a team! Leave your current team first.",
+                        ephemeral=True,
+                    )
+                except (discord.errors.InteractionResponded, discord.errors.NotFound):
+                    self.logger.warning("Could not send team membership error - interaction already handled")
                 return
 
             discord_id = str(interaction.user.id)
@@ -47,30 +64,51 @@ class TeamCog(commands.Cog):
                 }
             )
 
-            await interaction.followup.send(
-                embed=embed,
-                content=f"✅ Team created! Your team code: `{code}`",
-                ephemeral=True,
-            )
+            try:
+                await interaction.followup.send(
+                    embed=embed,
+                    content=f"[SUCCESS] Team created! Your team code: `{code}`",
+                    ephemeral=True,
+                )
+            except (discord.errors.InteractionResponded, discord.errors.NotFound):
+                self.logger.warning("Could not send team creation response - interaction already handled")
             self.logger.info(f"Team created: {name} by {discord_username}")
 
         except Exception as e:
             self.logger.error(f"Create team error: {str(e)}")
-            await interaction.followup.send(
-                "❌ Failed to create team. Please try again later.", ephemeral=True
-            )
+            try:
+                if not interaction.is_expired():
+                    await interaction.followup.send(
+                        "[ERROR] Failed to create team. Please try again later.", ephemeral=True
+                    )
+            except Exception as followup_error:
+                self.logger.error(f"Failed to send create team error followup: {followup_error}")
 
     @app_commands.command(name="join-team", description="Join a team using a code")
     @app_commands.describe(code="Team invitation code")
     async def join_team(self, interaction: discord.Interaction, code: str):
         try:
-            await interaction.response.defer(ephemeral=True)
+            # Check if interaction is still valid
+            if interaction.is_expired():
+                self.logger.warning("Interaction has expired, cannot respond")
+                return
+
+            # Defer the response since we do database operations
+            try:
+                await interaction.response.defer(ephemeral=True)
+            except discord.errors.InteractionResponded:
+                self.logger.warning("Interaction already responded to")
+                return
+
             profile = db.get_profile(str(interaction.user.id))
             if not profile:
-                await interaction.followup.send(
-                    "❌ You need to create a profile first using `/register-profile`",
-                    ephemeral=True,
-                )
+                try:
+                    await interaction.followup.send(
+                        "[ERROR] You need to create a profile first using `/register-profile`",
+                        ephemeral=True,
+                    )
+                except (discord.errors.InteractionResponded, discord.errors.NotFound):
+                    self.logger.warning("Could not send profile error - interaction already handled")
                 return
 
             discord_id = str(interaction.user.id)
@@ -80,17 +118,23 @@ class TeamCog(commands.Cog):
 
             current_team = db.get_team_by_member(discord_id)
             if current_team:
-                await interaction.followup.send(
-                    "❌ You're already in a team! Leave your current team first.",
-                    ephemeral=True,
-                )
+                try:
+                    await interaction.followup.send(
+                        "[ERROR] You're already in a team! Leave your current team first.",
+                        ephemeral=True,
+                    )
+                except (discord.errors.InteractionResponded, discord.errors.NotFound):
+                    self.logger.warning("Could not send team membership error - interaction already handled")
                 return
 
             team = db.get_team_by_code(code.strip().upper())
             if not team:
-                await interaction.followup.send(
-                    "❌ Invalid team code. Please check and try again.", ephemeral=True
-                )
+                try:
+                    await interaction.followup.send(
+                        "[ERROR] Invalid team code. Please check and try again.", ephemeral=True
+                    )
+                except (discord.errors.InteractionResponded, discord.errors.NotFound):
+                    self.logger.warning("Could not send invalid code error - interaction already handled")
                 return
 
             db.add_team_member(team["id"], discord_id, discord_username)
@@ -107,32 +151,53 @@ class TeamCog(commands.Cog):
                 }
             )
 
-            await interaction.followup.send(
-                embed=embed,
-                content=f"✅ You've joined team **{team['name']}**!",
-                ephemeral=True,
-            )
+            try:
+                await interaction.followup.send(
+                    embed=embed,
+                    content=f"[SUCCESS] You've joined team **{team['name']}**!",
+                    ephemeral=True,
+                )
+            except (discord.errors.InteractionResponded, discord.errors.NotFound):
+                self.logger.warning("Could not send join team response - interaction already handled")
             self.logger.info(f"{discord_username} joined team {team['name']}")
 
         except Exception as e:
             self.logger.error(f"Join team error: {str(e)}")
-            await interaction.followup.send(
-                "❌ Failed to join team. Please try again later.", ephemeral=True
-            )
+            try:
+                if not interaction.is_expired():
+                    await interaction.followup.send(
+                        "[ERROR] Failed to join team. Please try again later.", ephemeral=True
+                    )
+            except Exception as followup_error:
+                self.logger.error(f"Failed to send join team error followup: {followup_error}")
 
     @app_commands.command(
         name="view-team", description="View your current team information"
     )
     async def view_team(self, interaction: discord.Interaction):
         try:
-            await interaction.response.defer(ephemeral=True)
+            # Check if interaction is still valid
+            if interaction.is_expired():
+                self.logger.warning("Interaction has expired, cannot respond")
+                return
+
+            # Defer the response since we do database operations
+            try:
+                await interaction.response.defer(ephemeral=True)
+            except discord.errors.InteractionResponded:
+                self.logger.warning("Interaction already responded to")
+                return
+
             discord_id = str(interaction.user.id)
             team = db.get_team_by_member(discord_id)
 
             if not team:
-                await interaction.followup.send(
-                    "❌ You're not currently in a team.", ephemeral=True
-                )
+                try:
+                    await interaction.followup.send(
+                        "[ERROR] You're not currently in a team.", ephemeral=True
+                    )
+                except (discord.errors.InteractionResponded, discord.errors.NotFound):
+                    self.logger.warning("Could not send no team error - interaction already handled")
                 return
 
             members = db.get_team_members(team["id"])
@@ -150,49 +215,80 @@ class TeamCog(commands.Cog):
                 }
             )
 
-            await interaction.followup.send(embed=embed, ephemeral=True)
+            try:
+                await interaction.followup.send(embed=embed, ephemeral=True)
+            except (discord.errors.InteractionResponded, discord.errors.NotFound):
+                self.logger.warning("Could not send team info response - interaction already handled")
 
         except Exception as e:
             self.logger.error(f"View team error: {str(e)}")
-            await interaction.followup.send(
-                "❌ Failed to retrieve team information.", ephemeral=True
-            )
+            try:
+                if not interaction.is_expired():
+                    await interaction.followup.send(
+                        "[ERROR] Failed to retrieve team information.", ephemeral=True
+                    )
+            except Exception as followup_error:
+                self.logger.error(f"Failed to send view team error followup: {followup_error}")
 
     @app_commands.command(name="leave-team", description="Leave your current team")
     async def leave_team(self, interaction: discord.Interaction):
         try:
-            await interaction.response.defer(ephemeral=True)
+            # Check if interaction is still valid
+            if interaction.is_expired():
+                self.logger.warning("Interaction has expired, cannot respond")
+                return
+
+            # Defer the response since we do database operations
+            try:
+                await interaction.response.defer(ephemeral=True)
+            except discord.errors.InteractionResponded:
+                self.logger.warning("Interaction already responded to")
+                return
+
             discord_id = str(interaction.user.id)
             discord_username = f"{interaction.user.name}"
 
             team = db.get_team_by_member(discord_id)
             if not team:
-                await interaction.followup.send(
-                    "❌ You're not currently in a team.", ephemeral=True
-                )
+                try:
+                    await interaction.followup.send(
+                        "[ERROR] You're not currently in a team.", ephemeral=True
+                    )
+                except (discord.errors.InteractionResponded, discord.errors.NotFound):
+                    self.logger.warning("Could not send no team error - interaction already handled")
                 return
 
             if team["owner_id"] == discord_id:
-                await interaction.followup.send(
-                    "❌ Team owners cannot leave their team. Transfer ownership first or delete the team.",
-                    ephemeral=True,
-                )
+                try:
+                    await interaction.followup.send(
+                        "[ERROR] Team owners cannot leave their team. Transfer ownership first or delete the team.",
+                        ephemeral=True,
+                    )
+                except (discord.errors.InteractionResponded, discord.errors.NotFound):
+                    self.logger.warning("Could not send owner leave error - interaction already handled")
                 return
-            
+
             db.remove_team_member(discord_id)
 
             db.delete_team_if_empty(team["id"])
 
-            await interaction.followup.send(
-                f"✅ You've left team **{team['name']}**.", ephemeral=True
-            )
+            try:
+                await interaction.followup.send(
+                    f"[SUCCESS] You've left team **{team['name']}**.", ephemeral=True
+                )
+            except (discord.errors.InteractionResponded, discord.errors.NotFound):
+                self.logger.warning("Could not send leave team response - interaction already handled")
             self.logger.info(f"{discord_username} left team {team['name']}")
 
         except Exception as e:
             self.logger.error(f"Leave team error: {str(e)}")
-            await interaction.followup.send(
-                "❌ Failed to leave team. Please try again later.", ephemeral=True
-            )
+            try:
+                if not interaction.is_expired():
+                    await interaction.followup.send(
+                        "[ERROR] Failed to leave team. Please try again later.", ephemeral=True
+                    )
+            except Exception as followup_error:
+                self.logger.error(f"Failed to send leave team error followup: {followup_error}")
 
     @app_commands.command(name="delete-team", description="Delete your team (owners only)")
     async def delete_team(self, interaction: discord.Interaction):

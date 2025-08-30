@@ -167,33 +167,47 @@ class EmailDatabase:
             logger.error(f"Failed to create template: {str(e)}")
             return False
 
+    def _row_to_dict(self, row):
+        """Safely convert database row to dictionary regardless of backend."""
+        if row is None:
+            return None
+        if self.mode == "postgres":
+            return dict(row)
+        else:
+            # SQLite Row object
+            return {key: row[key] for key in row.keys()}
+
     def get_template(self, template_id: str):
         query = "SELECT * FROM email_templates WHERE id = %s" if self.mode == "postgres" else "SELECT * FROM email_templates WHERE id = ?"
         with self.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(query, (template_id,))
-            return cursor.fetchone()
+            row = cursor.fetchone()
+            return self._row_to_dict(row)
 
     def get_template_by_name(self, category: str, name: str):
         query = "SELECT * FROM email_templates WHERE category = %s AND name = %s" if self.mode == "postgres" else "SELECT * FROM email_templates WHERE category = ? AND name = ?"
         with self.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(query, (category, name))
-            return cursor.fetchone()
+            row = cursor.fetchone()
+            return self._row_to_dict(row)
 
     def get_templates_by_category(self, category: str):
         query = "SELECT * FROM email_templates WHERE category = %s ORDER BY name" if self.mode == "postgres" else "SELECT * FROM email_templates WHERE category = ? ORDER BY name"
         with self.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(query, (category,))
-            return cursor.fetchall()
+            rows = cursor.fetchall()
+            return [self._row_to_dict(row) for row in rows]
 
     def get_all_templates(self):
         query = "SELECT * FROM email_templates ORDER BY category, name"
         with self.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(query)
-            return cursor.fetchall()
+            rows = cursor.fetchall()
+            return [self._row_to_dict(row) for row in rows]
 
     def update_template(self, template_id: str, updates: Dict[str, Any]) -> bool:
         if not updates:
@@ -277,17 +291,24 @@ class EmailDatabase:
         with self.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(query, tuple(params))
-            return cursor.fetchall()
+            rows = cursor.fetchall()
+            return [self._row_to_dict(row) for row in rows]
 
     def get_email_stats(self) -> Dict[str, Any]:
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT COUNT(*) FROM email_logs")
-            total = cursor.fetchone()[0] if self.mode == "sqlite" else cursor.fetchone()["count"]
 
-            cursor.execute("SELECT COUNT(*) FROM email_logs WHERE status = 'sent'")
-            sent = cursor.fetchone()[0] if self.mode == "sqlite" else cursor.fetchone()["count"]
+            # Get total emails
+            cursor.execute("SELECT COUNT(*) as count FROM email_logs")
+            total_row = cursor.fetchone()
+            total = self._row_to_dict(total_row)["count"]
 
+            # Get successful emails
+            cursor.execute("SELECT COUNT(*) as count FROM email_logs WHERE status = 'sent'")
+            sent_row = cursor.fetchone()
+            sent = self._row_to_dict(sent_row)["count"]
+
+            # Get popular templates
             cursor.execute('''
                 SELECT template_name, COUNT(*) as usage_count
                 FROM email_logs
@@ -295,22 +316,25 @@ class EmailDatabase:
                 ORDER BY usage_count DESC
                 LIMIT {}
             '''.format("%s" if self.mode == "postgres" else "?"), (5,))
-            popular = cursor.fetchall()
+            popular_rows = cursor.fetchall()
+            popular = [self._row_to_dict(row) for row in popular_rows]
 
+            # Get recent activity
             cursor.execute('''
-                SELECT COUNT(*) FROM email_logs
+                SELECT COUNT(*) as count FROM email_logs
                 WHERE sent_at >= (CURRENT_TIMESTAMP - INTERVAL '7 days')
             ''' if self.mode == "postgres" else '''
-                SELECT COUNT(*) FROM email_logs
+                SELECT COUNT(*) as count FROM email_logs
                 WHERE sent_at >= datetime('now', '-7 days')
             ''')
-            recent = cursor.fetchone()[0] if self.mode == "sqlite" else cursor.fetchone()["count"]
+            recent_row = cursor.fetchone()
+            recent = self._row_to_dict(recent_row)["count"]
 
             return {
                 "total_emails": total,
                 "successful_emails": sent,
                 "success_rate": (sent / total * 100) if total > 0 else 0,
-                "popular_templates": [dict(row) for row in popular] if self.mode == "postgres" else [dict(row) for row in popular],
+                "popular_templates": popular,
                 "recent_activity": recent
             }
 

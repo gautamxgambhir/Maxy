@@ -77,30 +77,30 @@ class MaximallyBot(commands.Bot):
             memory_usage = f"{memory.percent:.1f}%"
 
             embed = discord.Embed(
-                title="🤖 Bot Health Check",
+                title="[BOT] Health Check",
                 color=discord.Color.green()
             )
 
             embed.add_field(
-                name="📊 System Status",
+                name="[SYSTEM] Status",
                 value=f"**Memory Usage:** {memory_usage}\n**Platform:** {platform.system()}",
                 inline=False
             )
 
             embed.add_field(
-                name="💾 Database",
+                name="[DB] Database",
                 value=db_status,
                 inline=True
             )
 
             embed.add_field(
-                name="📧 Email System",
+                name="[EMAIL] System",
                 value=email_status,
                 inline=True
             )
 
             embed.add_field(
-                name="⚡ Uptime",
+                name="[UPTIME] Uptime",
                 value=f"<t:{int(self.start_time.timestamp())}:R>",
                 inline=True
             )
@@ -112,7 +112,7 @@ class MaximallyBot(commands.Bot):
         except Exception as e:
             self.logger.error(f"Health check error: {e}")
             await interaction.response.send_message(
-                "❌ Health check failed",
+                "[ERROR] Health check failed",
                 ephemeral=True
             )
 
